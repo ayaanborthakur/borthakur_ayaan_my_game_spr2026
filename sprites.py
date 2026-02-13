@@ -4,7 +4,12 @@ from settings import *
 import math
 
 vec = pg.math.Vector2
-
+def collide(one,two):
+    return one.hitrect.collidrect(two.rect)
+def collide_walls(sprite,group,dir):
+    if dir == 'x':
+        hits = pg.sprite.spritecollide(sprite,group,False,collide)
+        
 class Player(Sprite):
     def __init__(self, game, x, y):
         #intializes neccesary values
@@ -19,7 +24,7 @@ class Player(Sprite):
         self.vel = vec(0,0)
         self.pos = vec(x*32,y*32)
         #self.pos = vec(x,y) * TILESIZE[1]
-
+        self.hit_rect = PLAYER_HIT_SIZE
     def update(self):
         #get keys and check if character is even moving
         is_moving = self.get_keys()
