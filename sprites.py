@@ -33,12 +33,8 @@ def collide_walls(sprite, group):
             if point.magnitude() < sprite.vel.magnitude():
                 set_point = old_point
         
-        # offset by half the sprite's size along the velocity direction
-        if sprite.vel.magnitude() > 0:
-            direction = sprite.vel.normalize()
-            extra = vec(direction.x * sprite.rect.width / 2, direction.y * sprite.rect.height / 2)
-        else:
-            extra = vec(0, 0)
+        
+        extra = sprite.edge_offset
 
         set_point = set_point - extra
         sprite.pos = set_point
@@ -83,7 +79,19 @@ class Player(Sprite):
         
         
 
-        self.vel_line = ((self.pos.x,self.pos.y),(self.pos.x + self.vel.x,self.pos.y + self.vel.y))
+        if self.vel.magnitude() > 0:
+            far_end = (self.pos.x + self.vel.x * 100, self.pos.y + self.vel.y * 100)
+            clipped = self.rect.clipline((self.pos.x, self.pos.y), far_end)
+            if clipped:
+                edge_point = clipped[1]  
+                self.edge_offset = vec(edge_point[0] - self.pos.x, edge_point[1] - self.pos.y)
+                self.vel_line = (edge_point, (edge_point[0] + self.vel.x, edge_point[1] + self.vel.y))
+            else:
+                self.edge_offset = vec(0, 0)
+                self.vel_line = ((self.pos.x, self.pos.y),(self.pos.x + self.vel.x, self.pos.y + self.vel.y))
+        else:
+            self.edge_offset = vec(0, 0)
+            self.vel_line = ((self.pos.x, self.pos.y),(self.pos.x, self.pos.y))
         print("vel_line1"+str(self.vel_line))
         self.accel *= 0
         # applysing friciton if player is not actively trying to move
