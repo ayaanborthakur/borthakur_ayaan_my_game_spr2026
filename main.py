@@ -23,6 +23,13 @@ class Game:
 
     def load_data(self):
         self.game_dir = path.dirname(__file__)
+        self.img_dir = path.join(self.game_dir, "spritesheets")
+        self.wall_img = pg.image.load(
+            path.join(self.img_dir, "wall_image.png")
+        ).convert_alpha()
+        self.coin_img = pg.image.load(
+            path.join(self.img_dir, "coin.png")
+        ).convert_alpha()
         self.map = Map(path.join(self.game_dir, "level1.txt"))
 
     def new(self):
@@ -30,7 +37,7 @@ class Game:
         self.load_data()
         self.all_sprites = pg.sprite.Group()
         self.all_walls = pg.sprite.Group()
-
+        self.all_coins = pg.sprite.Group()
         self.all_mobs = pg.sprite.Group()
         self.all_mobs.add(Mob(self, 10, 10))
         for row, tiles in enumerate(self.map.data):
@@ -40,6 +47,8 @@ class Game:
                     print(row, col)
                 if tile == "p":
                     self.player = Player(self, col, row)
+                if tile == "c":
+                    self.all_coins.add(Coin(self, row, col))
 
     def run(self):
         # runs the game
