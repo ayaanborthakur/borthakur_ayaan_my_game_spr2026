@@ -208,9 +208,13 @@ class Player(Sprite):
         self.animate()
 
     def load_images(self):
-        self.frames = [
+        self.standing_frames = [
             self.spritesheet.get_image(0, 0, TILESIZE, TILESIZE),
             self.spritesheet.get_image(TILESIZE, 0, TILESIZE, TILESIZE),
+        ]
+        self.running_frames = [
+            self.spritesheet.get_image(0, TILESIZE, TILESIZE, TILESIZE),
+            self.spritesheet.get_image(TILESIZE, TILESIZE, TILESIZE, TILESIZE),
         ]
         # for frame in self.frames:
         #    frame.set_colorkey(BLACK)
@@ -220,9 +224,16 @@ class Player(Sprite):
 
         if now - self.last_update > 35:
             self.last_update = now
-            self.current_frame = (self.current_frame + 1) % len(self.frames)
             center = self.rect.center
-            self.image = self.frames[self.current_frame]
+            if "running" in self.states:
+                self.current_frame = (self.current_frame + 1) % len(self.running_frames)
+                self.image = self.running_frames[self.current_frame]
+            else:
+                self.current_frame = (self.current_frame + 1) % len(
+                    self.standing_frames
+                )
+                self.image = self.standing_frames[self.current_frame]
+
             self.rect = self.image.get_rect()
             self.rect.center = center
 
