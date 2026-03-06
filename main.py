@@ -40,6 +40,7 @@ class Game:
         self.all_coins = pg.sprite.Group()
         self.all_mobs = pg.sprite.Group()
         self.all_mobs.add(Mob(self, 10, 10))
+
         for row, tiles in enumerate(self.map.data):
             for col, tile in enumerate(tiles):
                 if tile == "1":
@@ -77,8 +78,10 @@ class Game:
                     pass
 
     def update(self):
+
         self.all_sprites.update()
 
+    # not used anymore
     def draw_text(self, surface, text, size, color, x, y):
         font_name = pg.font.match_font("arial")
         font = pg.font.Font(font_name, size)
@@ -87,6 +90,7 @@ class Game:
         text_rect.midtop = (x, y)
         surface.blit(text_surface, text_rect)
 
+    # draws all sprites
     def draw(self):
         self.screen.fill(WHITE)
         self.draw_text(
@@ -99,6 +103,8 @@ class Game:
         )
         self.all_sprites.draw(self.screen)
         pg.display.flip()
+
+        self.all_sprites.draw(self.screen)
 
 
 if __name__ == "__main__":

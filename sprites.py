@@ -9,127 +9,93 @@ from utils import *
 vec = pg.math.Vector2
 
 
-def collide(one, two):
-    return two.rect.clipline(one.vel_line)
+EPSILON = 0  # sub-pixel gap to prevent floating-point sticking, but doesn't work
 
 
-# WORK IN THIS ONE
-def collide_walls_new(sprite, group):
+def swept_aabb_collide(sprite, group):
     """
-    Checks collision using vel lines from each corner of the sprite.
-    Each corner gets its own vel line (corner -> corner + vel).
-    If a corner's line hits a wall, that corner should stop at the hit point.
+    Swept AABB collision
+    inflate walls by size of player
+    check if vector of player drawn from player center hits the wall
+    move to the hit position closest to the center
+
     """
+    # sprite glitchs on left and top walls
+    if sprite.vel.length_squared() == 0:
+        return
 
-    # dictionary with the corner position as the key and the vel line from that corner as the value
-    corners = {
-        "topright": vec(sprite.rect.topright),
-        "topleft": vec(sprite.rect.topleft),
-        "bottomright": vec(sprite.rect.bottomright),
-        "bottomleft": vec(sprite.rect.bottomleft),
-    }
+    start = vec(sprite.pos)
+    end = start + sprite.vel
 
-    vel_lines = {}
-    for name, corner in corners.items():
-        # only include "leading" corners - those on the side the sprite is moving toward
-        corner_from_center = corner - sprite.pos
-        if corner_from_center.dot(sprite.vel) > 0:
-            line_start = (corner.x, corner.y)
-            line_end = (corner.x + sprite.vel.x, corner.y + sprite.vel.y)
-            vel_lines[name] = (line_start, line_end)
+    closest_t = 1.0  # fraction of velocity before first hit (1.0 = no hit)
+    hit_normal = None
 
-    # dictionary: corner name -> (closest hit point, wall that was hit)
-    points = {}
-    for name, line in vel_lines.items():
-        corner = corners[name]
-        for wall in group:
-            clipped = wall.rect.clipline(line)
-            if clipped:
-                for pt in clipped:
-                    p = vec(pt[0], pt[1])
-                    dist = (p - corner).magnitude()
-                    # keep the closest point for this corner
-                    if (
-                        name not in points
-                        or dist < (vec(points[name][0]) - corner).magnitude()
-                    ):
-                        points[name] = (pt, wall)
+    for wall in group:
 
-    if points:
-        # find which corner hit is closest to its starting position (i.e. first impact)
-        best_name = None
-        best_dist = float("inf")
+        inflated = wall.rect.inflate(sprite.rect.width, sprite.rect.height)
 
-        for name, (pt, wall) in points.items():
-            corner = corners[name]
-            p = vec(pt[0], pt[1])
-            dist = (p - corner).magnitude()
-            if dist < best_dist:
-                best_dist = dist
-                best_name = name
+        if inflated.collidepoint(start.x, start.y):
+            # Push out: find smallest penetration axis and resolve
+            dx_left = start.x - inflated.left
+            dx_right = inflated.right - start.x
+            dy_top = start.y - inflated.top
+            dy_bottom = inflated.bottom - start.y
 
-        # set the relevant corner to be the hit point
-        best_pt, best_wall = points[best_name]
-        hit_point = vec(best_pt[0], best_pt[1])
-        corner_offset = (
-            corners[best_name] - sprite.pos
-        )  # vector from center to that corner
-        sprite.pos = hit_point - corner_offset
-        # only check the wall that was actually hit
-        if "x" in check_side_collision(hit_point, best_wall):
-            sprite.vel.x = 0
-        if "y" in check_side_collision(hit_point, best_wall):
-            sprite.vel.y = 0
-        sprite.vel = vec(0, 0)
+            min_pen = min(dx_left, dx_right, dy_top, dy_bottom)
+            if min_pen == dx_left:
+                sprite.pos.x = inflated.left  # - EPSILON
+                sprite.vel.x = min(sprite.vel.x, 0)
+            elif min_pen == dx_right:
+                sprite.pos.x = inflated.right  # + EPSILON
+                sprite.vel.x = max(sprite.vel.x, 0)
+            elif min_pen == dy_top:
+                sprite.pos.y = inflated.top  # - EPSILON
+                sprite.vel.y = min(sprite.vel.y, 0)
+            elif min_pen == dy_bottom:
+                sprite.pos.y = inflated.bottom  # + EPSILON
+                sprite.vel.y = max(sprite.vel.y, 0)
 
+            start = vec(sprite.pos)
+            end = start + sprite.vel
+            continue
 
-def check_side_collision(hit_point, wall):
-    # find which edge of the wall the hit point is closest to
-    dist_left = abs(hit_point.x - wall.rect.left)
-    dist_right = abs(hit_point.x - wall.rect.right)
-    dist_top = abs(hit_point.y - wall.rect.top)
-    dist_bottom = abs(hit_point.y - wall.rect.bottom)
+        clipped = inflated.clipline(start, end)
 
-    min_dist = min(dist_left, dist_right, dist_top, dist_bottom)
-    return_val = []
-    # closest to left or right edge = x axis collision
-    if min_dist == dist_left or min_dist == dist_right:
-        return_val.append("x")
-    # closest to top or bottom edge = y axis collision
-    if min_dist == dist_top or min_dist == dist_bottom:
-        return_val.append("y")
-    return return_val
+        if clipped:
+            hit_pt = vec(clipped[0])
+            dist = (hit_pt - start).length()
+            total = sprite.vel.length()
+            if total > 0:
+                t = dist / total
+                if t < closest_t:
+                    closest_t = t
 
+                    # Determine collision normal from inflated rect edges
+                    normal = vec(0, 0)
+                    eps = 1.0  # tolerance for edge detection
+                    if abs(hit_pt.x - inflated.left) < eps:
+                        normal = vec(-1, 0)
+                    elif abs(hit_pt.x - inflated.right) < eps:
+                        normal = vec(1, 0)
+                    elif abs(hit_pt.y - inflated.top) < eps:
+                        normal = vec(0, -1)
+                    elif abs(hit_pt.y - inflated.bottom) < eps:
+                        normal = vec(0, 1)
+                    hit_normal = normal
 
-def collide_walls(sprite, group):
-    """
-    returns stuff
-    """
+    if hit_normal is not None:
+        # move to the collision point (epsilon commented out for now)
+        # vel_len = sprite.vel.length()
+        # if vel_len > 0:
+        #     pull_t = EPSILON / vel_len
+        #     adjusted_t = max(0, closest_t - pull_t)
+        # else:
+        #     adjusted_t = closest_t
+        sprite.pos = start + sprite.vel * closest_t
 
-    hits = pg.sprite.spritecollide(sprite, group, False, collide)
-    points = []
-    for wall in hits:
-        line = wall.rect.clipline(sprite.vel_line)
-        points.append(line[0])
-        points.append(line[1])
-
-    if points != []:
-        set_point = vec(points[0][0], points[0][1])
-
-        for point in points:
-            print("point is" + str(point))
-            point = vec(point[0], point[1])
-            old_point = point
-
-            point = point - sprite.pos
-            if point.magnitude() < sprite.vel.magnitude():
-                set_point = old_point
-
-        extra = sprite.edge_offset
-
-        set_point = set_point - extra
-        sprite.pos = set_point
-        sprite.vel = vec(0, 0)
+        remaining = sprite.vel * (1.0 - closest_t)
+        slide = remaining - remaining.dot(hit_normal) * hit_normal
+        sprite.vel = slide
 
 
 class Player(Sprite):
@@ -147,8 +113,6 @@ class Player(Sprite):
         self.vel = vec(0, 0)
         self.pos = vec(x, y) * TILESIZE
         self.rect.center = self.pos
-        self.hit_rect = pg.Rect(0, 0, 32, 32)
-        self.vel_line = ((0, 0), (0, 0))
         self.last_update = 0
         self.current_frame = 0
         self.states = []
@@ -171,28 +135,10 @@ class Player(Sprite):
         except:
             pass
 
-        # vel_line is only needed for the broad-phase collide check in spritecollide
-        # self.vel_line = ((self.pos.x, self.pos.y),(self.pos.x + self.vel.x, self.pos.y + self.vel.y))
-        # edge_offset and clipline-based vel_line no longer needed with collide_walls_new
-        # if self.vel.magnitude() > 0:
-        #     far_end = (self.pos.x + self.vel.x * 100, self.pos.y + self.vel.y * 100)
-        #     clipped = self.rect.clipline((self.pos.x, self.pos.y), far_end)
-        #     if clipped:
-        #         edge_point = clipped[1]
-        #         self.edge_offset = vec(edge_point[0] - self.pos.x, edge_point[1] - self.pos.y)
-        #         self.vel_line = (edge_point, (edge_point[0] + self.vel.x, edge_point[1] + self.vel.y))
-        #     else:
-        #         self.edge_offset = vec(0, 0)
-        #         self.vel_line = ((self.pos.x, self.pos.y),(self.pos.x + self.vel.x, self.pos.y + self.vel.y))
-        # else:
-        #     self.edge_offset = vec(0, 0)
-        #     self.vel_line = ((self.pos.x, self.pos.y),(self.pos.x, self.pos.y))
-        # print("vel_line1"+str(self.vel_line))
         self.accel *= 0
-        # applysing friciton if player is not actively trying to move
 
         # checking if its hitting anything else
-        collide_walls_new(self, self.game.all_walls)
+        swept_aabb_collide(self, self.game.all_walls)
         self.pos += self.vel
         self.rect.center = self.pos
 
@@ -208,6 +154,7 @@ class Player(Sprite):
         self.animate()
 
     def load_images(self):
+        # loads images for the player
         self.standing_frames = [
             self.spritesheet.get_image(0, 0, TILESIZE, TILESIZE),
             self.spritesheet.get_image(TILESIZE, 0, TILESIZE, TILESIZE),
@@ -222,7 +169,7 @@ class Player(Sprite):
     def animate(self):
         now = pg.time.get_ticks()
 
-        if now - self.last_update > 35:
+        if now - self.last_update > 75:
             self.last_update = now
             center = self.rect.center
             if "running" in self.states:
@@ -291,7 +238,7 @@ class Mob(Sprite):
         except:
             pass
 
-        collide_walls_new(self, self.game.all_walls)
+        swept_aabb_collide(self, self.game.all_walls)
         self.pos += self.vel
         self.rect.center = self.pos
 
