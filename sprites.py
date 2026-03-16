@@ -118,6 +118,7 @@ class Player(Sprite):
         self.states = []
         self.spritesheet = Spritesheet(path.join(self.game.img_dir, "sprite_sheet.png"))
         self.load_images()
+        self.camera = Camera(self, self.game)
 
     def update(self):
         # get keys and check if character is even moving
@@ -139,6 +140,7 @@ class Player(Sprite):
 
         # checking if its hitting anything else
         swept_aabb_collide(self, self.game.all_walls)
+
         self.pos += self.vel
         self.rect.center = self.pos
 
@@ -245,7 +247,6 @@ class Mob(Sprite):
     # gets teh neccesrary accleration to get to the player
     def move(self, pos):
 
-        prevel = self.vel
         self.accel = pos - self.pos
 
 
@@ -254,12 +255,17 @@ class Wall(Sprite):
         self.groups = game.all_sprites
         Sprite.__init__(self, self.groups)
         self.game = game
-        self.image = game.wall_img
-
+        self.image = pg.Surface((TILESIZE, TILESIZE))
+        self.image.blit(
+            pg.transform.scale(game.wall_img, (TILESIZE, TILESIZE)),
+            (0, 0),
+            (x, y, TILESIZE, TILESIZE),
+        )
+        self.image.fill(BLACK)
         self.rect = self.image.get_rect()
 
         self.vel = vec(0, 0)
-        self.pos = vec((x * 32) + 16, (y * 32) + 16)
+        self.pos = vec((x * TILESIZE) + 16, (y * TILESIZE) + 16)
         # self.pos = vec(x,y) * TILESIZE[1]
 
     def update(self):
@@ -276,7 +282,7 @@ class Coin(Sprite):
         self.rect = self.image.get_rect()
 
         self.vel = vec(0, 0)
-        self.pos = vec((x * 32) + 16, (y * 32) + 16)
+        self.pos = vec((x * TILESIZE) + 16, (y * TILESIZE) + 16)
         # self.pos = vec(x,y) * TILESIZE[1]
 
     def update(self):

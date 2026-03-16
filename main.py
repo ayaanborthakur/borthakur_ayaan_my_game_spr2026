@@ -44,12 +44,13 @@ class Game:
         for row, tiles in enumerate(self.map.data):
             for col, tile in enumerate(tiles):
                 if tile == "1":
-                    self.all_walls.add(Wall(self, row, col))
-                    print(row, col)
+                    self.all_walls.add(Wall(self, col, row))
+
+                if tile == "c":
+                    self.all_coins.add(Coin(self, col, row))
+            for col, tile in enumerate(tiles):
                 if tile == "p":
                     self.player = Player(self, col, row)
-                if tile == "c":
-                    self.all_coins.add(Coin(self, row, col))
 
     def run(self):
         # runs the game
@@ -101,10 +102,10 @@ class Game:
             500,
             100,
         )
-        self.all_sprites.draw(self.screen)
+        self.player.camera.update()
+        for sprite in self.all_sprites:
+            self.screen.blit(sprite.image, self.player.camera.apply(sprite))
         pg.display.flip()
-
-        self.all_sprites.draw(self.screen)
 
 
 if __name__ == "__main__":
