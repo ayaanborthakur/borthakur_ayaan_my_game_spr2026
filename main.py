@@ -52,8 +52,11 @@ class Game:
                 if tile == "c":
                     self.all_coins.add(Coin(self, col, row))
             for col, tile in enumerate(tiles):
-                if tile == "p":
-                    self.player = Player(self, col, row)
+                if tile == "a":
+                    self.player1 = Player1(self, col, row)
+
+                if tile == "b":
+                    self.player2 = Player2(self, col, row)
 
     def run(self):
         # runs the game
@@ -108,10 +111,13 @@ class Game:
         )
         self.left_side.fill(WHITE)
         self.right_side.fill(WHITE)
-        self.player.camera.update()
+        self.player1.camera.update()
+        self.player2.camera.update()
         for sprite in self.all_sprites:
-            self.left_side.blit(sprite.image, self.player.camera.apply(sprite))
+            self.left_side.blit(sprite.image, self.player1.camera.apply(sprite))
+            self.right_side.blit(sprite.image, self.player2.camera.apply(sprite))
         self.screen.blit(self.left_side, (0, 0))
+        self.screen.blit(self.right_side, (WIDTH / 2, 0))
         pg.display.flip()
 
 

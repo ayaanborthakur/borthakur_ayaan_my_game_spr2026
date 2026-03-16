@@ -34,8 +34,10 @@ def swept_aabb_collide(sprite, group):
 
         inflated = wall.rect.inflate(sprite.rect.width, sprite.rect.height)
 
-        if (inflated.left < start.x < inflated.right and
-                inflated.top < start.y < inflated.bottom):
+        if (
+            inflated.left < start.x < inflated.right
+            and inflated.top < start.y < inflated.bottom
+        ):
             # Push out: find smallest penetration axis and resolve
             dx_left = start.x - inflated.left
             dx_right = inflated.right - start.x
@@ -99,7 +101,7 @@ def swept_aabb_collide(sprite, group):
         sprite.vel = slide
 
 
-class Player(Sprite):
+class Player1(Sprite):
 
     def __init__(self, game, x, y):
         # intializes neccesary values
@@ -207,6 +209,114 @@ class Player(Sprite):
         return value
 
 
+class Player2(Sprite):
+
+    def __init__(self, game, x, y):
+        # intializes neccesary values
+        self.groups = game.all_sprites
+        Sprite.__init__(self, self.groups)
+        self.game = game
+        self.image = pg.Surface((TILESIZE, TILESIZE))
+        self.image.fill(BLACK)
+        self.rect = self.image.get_rect()
+        # physics vectors for acceleration postion and velocity
+        self.accel = vec(0, 0)
+        self.vel = vec(0, 0)
+        self.pos = vec(x, y) * TILESIZE
+        self.rect.center = self.pos
+        self.last_update = 0
+        self.current_frame = 0
+        self.states = []
+        self.spritesheet = Spritesheet(path.join(self.game.img_dir, "sprite_sheet.png"))
+        self.load_images()
+        self.camera = Camera(self, self.game)
+
+    def update(self):
+        # get keys and check if character is even moving
+        self.states = []
+        is_moving = self.get_keys()
+        # applying acceleration to velocity and velocity to acceleration
+        try:
+            self.accel = self.accel.normalize() * ACCELERATION
+
+            self.vel += self.accel
+            if self.vel.magnitude() >= PLAYER_SPEED:
+
+                self.vel = self.vel.normalize() * PLAYER_SPEED
+
+        except:
+            pass
+
+        self.accel *= 0
+
+        # checking if its hitting anything else
+        swept_aabb_collide(self, self.game.all_walls)
+
+        self.pos += self.vel
+        self.rect.center = self.pos
+
+        if not is_moving:
+            self.states.append("slowing")
+            self.vel *= 0.75
+            if self.vel.magnitude() <= 0.05:
+                self.states.append("standing")
+                self.vel *= 0
+        else:
+            self.states.append("running")
+
+        self.animate()
+
+    def load_images(self):
+        # loads images for the player
+        self.standing_frames = [
+            self.spritesheet.get_image(0, 0, TILESIZE, TILESIZE),
+            self.spritesheet.get_image(TILESIZE, 0, TILESIZE, TILESIZE),
+        ]
+        self.running_frames = [
+            self.spritesheet.get_image(0, TILESIZE, TILESIZE, TILESIZE),
+            self.spritesheet.get_image(TILESIZE, TILESIZE, TILESIZE, TILESIZE),
+        ]
+        # for frame in self.frames:
+        #    frame.set_colorkey(BLACK)
+
+    def animate(self):
+        now = pg.time.get_ticks()
+
+        if now - self.last_update > 75:
+            self.last_update = now
+            center = self.rect.center
+            if "running" in self.states:
+                self.current_frame = (self.current_frame + 1) % len(self.running_frames)
+                self.image = self.running_frames[self.current_frame]
+            else:
+                self.current_frame = (self.current_frame + 1) % len(
+                    self.standing_frames
+                )
+                self.image = self.standing_frames[self.current_frame]
+
+            self.rect = self.image.get_rect()
+            self.rect.center = center
+
+    def get_keys(self):
+        # gets keys and stuff
+        keys = pg.key.get_pressed()
+
+        value = False
+        if keys[pg.K_UP]:
+            self.accel.y -= ACCELERATION
+            value = True
+        if keys[pg.K_LEFT]:
+            self.accel.x -= ACCELERATION
+            value = True
+        if keys[pg.K_DOWN]:
+            self.accel.y += ACCELERATION
+            value = True
+        if keys[pg.K_RIGHT]:
+            self.accel.x += ACCELERATION
+            value = True
+        return value
+
+
 class Mob(Sprite):
     # initialize the instance
     def __init__(self, game, x, y):
@@ -223,7 +333,7 @@ class Mob(Sprite):
 
     def update(self):
         # calls movement toward player
-        self.move(self.game.player.pos)
+        self.move(self.game.player1.pos)
         # same as player
         try:
 
