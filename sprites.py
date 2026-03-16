@@ -131,14 +131,15 @@ class Player1(Sprite):
         try:
             self.accel = self.accel.normalize() * ACCELERATION
 
-            self.vel += self.accel
-            if self.vel.magnitude() >= PLAYER_SPEED:
+            self.vel.x += self.accel.x
 
-                self.vel = self.vel.normalize() * PLAYER_SPEED
+            if abs(self.vel.x) >= PLAYER_SPEED:
+                self.vel.x = PLAYER_SPEED * (1 if self.vel.x > 0 else -1)
 
         except:
             pass
 
+        self.vel.y += GRAVITY
         self.accel *= 0
 
         # checking if its hitting anything else
@@ -149,10 +150,10 @@ class Player1(Sprite):
 
         if not is_moving:
             self.states.append("slowing")
-            self.vel *= 0.75
-            if self.vel.magnitude() <= 0.05:
+            self.vel.x *= 0.75
+            if abs(self.vel.x) <= 0.05:
                 self.states.append("standing")
-                self.vel *= 0
+                self.vel.x = 0
         else:
             self.states.append("running")
 
@@ -195,13 +196,10 @@ class Player1(Sprite):
 
         value = False
         if keys[pg.K_w]:
-            self.accel.y -= ACCELERATION
+            self.vel.y = -JUMP_SPEED
             value = True
         if keys[pg.K_a]:
             self.accel.x -= ACCELERATION
-            value = True
-        if keys[pg.K_s]:
-            self.accel.y += ACCELERATION
             value = True
         if keys[pg.K_d]:
             self.accel.x += ACCELERATION
@@ -239,14 +237,15 @@ class Player2(Sprite):
         try:
             self.accel = self.accel.normalize() * ACCELERATION
 
-            self.vel += self.accel
-            if self.vel.magnitude() >= PLAYER_SPEED:
+            self.vel.x += self.accel.x
 
-                self.vel = self.vel.normalize() * PLAYER_SPEED
+            if abs(self.vel.x) >= PLAYER_SPEED:
+                self.vel.x = PLAYER_SPEED * (1 if self.vel.x > 0 else -1)
 
         except:
             pass
 
+        self.vel.y += GRAVITY
         self.accel *= 0
 
         # checking if its hitting anything else
@@ -257,10 +256,10 @@ class Player2(Sprite):
 
         if not is_moving:
             self.states.append("slowing")
-            self.vel *= 0.75
-            if self.vel.magnitude() <= 0.05:
+            self.vel.x *= 0.75
+            if abs(self.vel.x) <= 0.05:
                 self.states.append("standing")
-                self.vel *= 0
+                self.vel.x = 0
         else:
             self.states.append("running")
 
@@ -303,13 +302,10 @@ class Player2(Sprite):
 
         value = False
         if keys[pg.K_UP]:
-            self.accel.y -= ACCELERATION
+            self.vel.y = -JUMP_SPEED
             value = True
         if keys[pg.K_LEFT]:
             self.accel.x -= ACCELERATION
-            value = True
-        if keys[pg.K_DOWN]:
-            self.accel.y += ACCELERATION
             value = True
         if keys[pg.K_RIGHT]:
             self.accel.x += ACCELERATION
