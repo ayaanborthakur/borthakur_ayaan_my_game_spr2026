@@ -34,7 +34,8 @@ def swept_aabb_collide(sprite, group):
 
         inflated = wall.rect.inflate(sprite.rect.width, sprite.rect.height)
 
-        if inflated.collidepoint(start.x, start.y):
+        if (inflated.left < start.x < inflated.right and
+                inflated.top < start.y < inflated.bottom):
             # Push out: find smallest penetration axis and resolve
             dx_left = start.x - inflated.left
             dx_right = inflated.right - start.x
@@ -43,16 +44,16 @@ def swept_aabb_collide(sprite, group):
 
             min_pen = min(dx_left, dx_right, dy_top, dy_bottom)
             if min_pen == dx_left:
-                sprite.pos.x = inflated.left  # - EPSILON
+                sprite.pos.x = inflated.left
                 sprite.vel.x = min(sprite.vel.x, 0)
             elif min_pen == dx_right:
-                sprite.pos.x = inflated.right  # + EPSILON
+                sprite.pos.x = inflated.right
                 sprite.vel.x = max(sprite.vel.x, 0)
             elif min_pen == dy_top:
-                sprite.pos.y = inflated.top  # - EPSILON
+                sprite.pos.y = inflated.top
                 sprite.vel.y = min(sprite.vel.y, 0)
             elif min_pen == dy_bottom:
-                sprite.pos.y = inflated.bottom  # + EPSILON
+                sprite.pos.y = inflated.bottom
                 sprite.vel.y = max(sprite.vel.y, 0)
 
             start = vec(sprite.pos)

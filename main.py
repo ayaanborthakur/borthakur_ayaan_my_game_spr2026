@@ -16,10 +16,13 @@ class Game:
         pg.init()
         self.clock = pg.time.Clock()
         self.screen = pg.display.set_mode((WIDTH, HEIGHT))
+
         pg.display.set_caption("Chris Cozort's awesome game!!!!!")
         self.playing = True
         # instanciates a 15 millisecond cooldown that can be used
         self.cooldown = Cooldown(15)
+        self.left_side = pg.Surface((WIDTH / 2, HEIGHT))
+        self.right_side = pg.Surface((WIDTH / 2, HEIGHT))
 
     def load_data(self):
         self.game_dir = path.dirname(__file__)
@@ -92,6 +95,7 @@ class Game:
         surface.blit(text_surface, text_rect)
 
     # draws all sprites
+
     def draw(self):
         self.screen.fill(WHITE)
         self.draw_text(
@@ -102,9 +106,12 @@ class Game:
             500,
             100,
         )
+        self.left_side.fill(WHITE)
+        self.right_side.fill(WHITE)
         self.player.camera.update()
         for sprite in self.all_sprites:
-            self.screen.blit(sprite.image, self.player.camera.apply(sprite))
+            self.left_side.blit(sprite.image, self.player.camera.apply(sprite))
+        self.screen.blit(self.left_side, (0, 0))
         pg.display.flip()
 
 

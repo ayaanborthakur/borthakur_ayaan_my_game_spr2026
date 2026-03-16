@@ -29,7 +29,7 @@ class Camera:
         self.offset = vec(0, 0)
 
     def update(self):
-        self.offset = self.player.pos - vec(WIDTH / 2, HEIGHT / 2)
+        self.offset = self.player.pos - vec(WIDTH / 4, HEIGHT / 2)
 
     def apply(self, sprite):
         return sprite.rect.move(-self.offset.x, -self.offset.y)
