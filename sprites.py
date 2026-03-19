@@ -2,14 +2,14 @@ import pygame as pg
 from pygame.sprite import Sprite
 from settings import *
 import math
-
+from state_machine import *
 from os import path
 from utils import *
 
 vec = pg.math.Vector2
 
 
-EPSILON = 0  # sub-pixel gap to prevent floating-point sticking, but doesn't work
+EPSILON = 0  # sub-pixel gap to prevent sticking, but doesn't work
 
 
 def swept_aabb_collide(sprite, group):
@@ -122,13 +122,17 @@ class Player1(Sprite):
         self.spritesheet = Spritesheet(path.join(self.game.img_dir, "sprite_sheet.png"))
         self.load_images()
         self.camera = Camera(self, self.game)
+        self.state_machine = StateMachine()
+        self.state_machine.start_machine(PLAYER1_STATES(self))
 
     def update(self):
         # get keys and check if character is even moving
+
         self.states = []
         is_moving = self.get_keys()
         # applying acceleration to velocity and velocity to acceleration
         try:
+
             self.accel = self.accel.normalize() * ACCELERATION
 
             self.vel.x += self.accel.x
@@ -140,7 +144,6 @@ class Player1(Sprite):
             pass
 
         self.vel.y += GRAVITY
-        self.accel *= 0
 
         # checking if its hitting anything else
         swept_aabb_collide(self, self.game.all_walls)
@@ -156,7 +159,8 @@ class Player1(Sprite):
                 self.vel.x = 0
         else:
             self.states.append("running")
-
+        self.accel *= 0
+        self.state_machine.update()
         self.animate()
 
     def load_images(self):

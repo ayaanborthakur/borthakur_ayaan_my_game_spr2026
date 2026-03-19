@@ -1,4 +1,5 @@
 import pygame as pg
+from state_machine import *
 
 TILESIZE = 16
 TILES_W = 64
@@ -16,6 +17,11 @@ PLAYER_SPEED = 7
 MOB_SPEED = 35
 FPS = 60
 SCORE = 0
+
+
+def PLAYER1_STATES(player):
+    return [Running(False, player), Idle(True, player)]
+
 
 TITLE = "hello"
 HEALTH = 100
