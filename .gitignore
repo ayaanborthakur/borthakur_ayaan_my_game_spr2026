@@ -1,1 +1,5 @@
-/__pycache__
+/__pycache_
+.vscode/*
+.vscode/settings.json
+
+__pycache__/*

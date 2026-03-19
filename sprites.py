@@ -101,7 +101,7 @@ def swept_aabb_collide(sprite, group):
         sprite.vel = slide
 
 
-class Player1(Sprite):
+class Player(Sprite):
 
     def __init__(self, game, x, y):
         # intializes neccesary values
@@ -152,15 +152,14 @@ class Player1(Sprite):
         self.rect.center = self.pos
 
         if not is_moving:
-            self.states.append("slowing")
+
             self.vel.x *= 0.75
             if abs(self.vel.x) <= 0.05:
-                self.states.append("standing")
+
                 self.vel.x = 0
-        else:
-            self.states.append("running")
-        self.accel *= 0
+
         self.state_machine.update()
+        self.accel *= 0
         self.animate()
 
     def load_images(self):
@@ -182,10 +181,10 @@ class Player1(Sprite):
         if now - self.last_update > 75:
             self.last_update = now
             center = self.rect.center
-            if "running" in self.states:
+            if self.state_machine.states["running"].active:
                 self.current_frame = (self.current_frame + 1) % len(self.running_frames)
                 self.image = self.running_frames[self.current_frame]
-            else:
+            elif self.state_machine.states["idle"].active:
                 self.current_frame = (self.current_frame + 1) % len(
                     self.standing_frames
                 )
@@ -201,7 +200,7 @@ class Player1(Sprite):
         value = False
         if keys[pg.K_w]:
             self.vel.y = -JUMP_SPEED
-            value = True
+
         if keys[pg.K_a]:
             self.accel.x -= ACCELERATION
             value = True
@@ -209,6 +208,12 @@ class Player1(Sprite):
             self.accel.x += ACCELERATION
             value = True
         return value
+
+
+class Player1(Player):
+
+    def __init__(self, game, x, y):
+        Player.__init__(self, game, x, y)
 
 
 class Player2(Sprite):
@@ -232,6 +237,8 @@ class Player2(Sprite):
         self.spritesheet = Spritesheet(path.join(self.game.img_dir, "sprite_sheet.png"))
         self.load_images()
         self.camera = Camera(self, self.game)
+        self.state_machine = StateMachine()
+        self.state_machine.start_machine(PLAYER1_STATES(self))
 
     def update(self):
         # get keys and check if character is even moving
@@ -250,7 +257,6 @@ class Player2(Sprite):
             pass
 
         self.vel.y += GRAVITY
-        self.accel *= 0
 
         # checking if its hitting anything else
         swept_aabb_collide(self, self.game.all_walls)
@@ -266,7 +272,8 @@ class Player2(Sprite):
                 self.vel.x = 0
         else:
             self.states.append("running")
-
+        self.state_machine.update()
+        self.accel *= 0
         self.animate()
 
     def load_images(self):
@@ -288,10 +295,10 @@ class Player2(Sprite):
         if now - self.last_update > 75:
             self.last_update = now
             center = self.rect.center
-            if "running" in self.states:
+            if self.state_machine.states["running"].active:
                 self.current_frame = (self.current_frame + 1) % len(self.running_frames)
                 self.image = self.running_frames[self.current_frame]
-            else:
+            elif self.state_machine.states["idle"].active:
                 self.current_frame = (self.current_frame + 1) % len(
                     self.standing_frames
                 )
