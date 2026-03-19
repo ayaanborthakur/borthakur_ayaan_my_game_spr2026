@@ -40,7 +40,8 @@ class Running(State):
         return "running"
 
     def check(self):
-        if self.player.accel.magnitude() >= 0:
+        # We use absolute value to check if moving left or right
+        if abs(self.player.vel.x) > 0.05:
             self.active = True
         else:
             self.active = False
