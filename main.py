@@ -56,10 +56,10 @@ class Game:
         #             self.all_coins.add(Coin(self, col, row))
         #     for col, tile in enumerate(tiles):
         #         if tile == "a":
-        #             self.player1 = Player1(self, col, row)
+        #             self.dino = Player1(self, col, row)
         #
         #         if tile == "b":
-        #             self.player2 = Player2(self, col, row)
+        #             self.alien = Alien(self, col, row)
 
     def load_map(self):
         map_path = path.join(self.game_dir, "maps", "main_map.json")
@@ -104,17 +104,17 @@ class Game:
                 
                 if obj["type"] == "Player":
                     if obj["name"] == "player1":
-                        self.player1 = Player1(self, grid_x, grid_y)
+                        self.dino = Dino(self, grid_x, grid_y)
                     elif obj["name"] == "player2":
-                        self.player2 = Player2(self, grid_x, grid_y)
+                        self.alien = Alien(self, grid_x, grid_y)
                 elif obj["type"] == "Mob":
                     self.all_mobs.add(Mob(self, grid_x, grid_y))
         
         # Failsafe if player 1 or 2 are missing in map JSON
-        if not hasattr(self, 'player1'):
-            self.player1 = Player1(self, 10, 10)
-        if not hasattr(self, 'player2'):
-            self.player2 = Player2(self, 12, 10)
+        if not hasattr(self, 'dino'):
+            self.dino = Dino(self, 10, 10)
+        if not hasattr(self, 'alien'):
+            self.alien = Alien(self, 12, 10)
 
     def run(self):
         # runs the game
@@ -162,11 +162,11 @@ class Game:
         
         self.left_side.fill(WHITE)
         self.right_side.fill(WHITE)
-        self.player1.camera.update()
-        self.player2.camera.update()
+        self.dino.camera.update()
+        self.alien.camera.update()
         for sprite in self.all_sprites:
-            self.left_side.blit(sprite.image, self.player1.camera.apply(sprite))
-            self.right_side.blit(sprite.image, self.player2.camera.apply(sprite))
+            self.left_side.blit(sprite.image, self.dino.camera.apply(sprite))
+            self.right_side.blit(sprite.image, self.alien.camera.apply(sprite))
         self.screen.blit(self.left_side, (0, 0))
         self.screen.blit(self.right_side, (WIDTH / 2, 0))
         pg.display.flip()

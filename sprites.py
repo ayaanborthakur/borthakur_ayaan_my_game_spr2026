@@ -129,7 +129,7 @@ class Player(Sprite):
         self.load_images()
         self.camera = Camera(self, self.game)
         self.state_machine = StateMachine()
-        self.state_machine.start_machine(PLAYER1_STATES(self))
+        self.state_machine.start_machine(Dino_STATES(self))
 
     def update(self):
         # get keys and check if character is even moving
@@ -218,13 +218,13 @@ class Player(Sprite):
         return value
 
 
-class Player1(Player):
+class Dino(Player):
 
     def __init__(self, game, x, y):
         Player.__init__(self, game, x, y)
     
 
-class Player2(Player):
+class Alien(Player):
 
     def __init__(self, game, x, y):
         Player.__init__(self, game, x, y)
@@ -264,7 +264,7 @@ class Mob(Sprite):
 
     def update(self):
         # calls movement toward player
-        self.move(self.game.player1.pos)
+        self.move(self.game.dino.pos)
         # same as player
         try:
 

@@ -19,7 +19,7 @@ FPS = 60
 SCORE = 0
 
 
-def PLAYER1_STATES(player):
+def Dino_STATES(player):
     return [Running(False, player), Idle(True, player), Airborne(False, player)]
 
 
