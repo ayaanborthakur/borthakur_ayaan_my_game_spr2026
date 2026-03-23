@@ -1,9 +1,9 @@
 import pygame as pg
 from state_machine import *
 
-TILESIZE = 16
-TILES_W = 64
-TILES_H = 48
+TILESIZE = 32
+TILES_W = 40
+TILES_H = 28
 WIDTH = TILESIZE * TILES_W
 HEIGHT = TILESIZE * TILES_H
 GREEN = (0, 255, 0)
@@ -20,7 +20,7 @@ SCORE = 0
 
 
 def PLAYER1_STATES(player):
-    return [Running(False, player), Idle(True, player)]
+    return [Running(False, player), Idle(True, player), Airborne(False, player)]
 
 
 TITLE = "hello"
@@ -29,5 +29,5 @@ MOB_ACCELERATION = 1.2
 FRICTION = 2.0
 ACCELERATION = 4.5
 GRAVITY = 0.5
-JUMP_SPEED = 4
+JUMP_SPEED = 10
 # PLAYER_HIT_SIZE = pg.Rect(0, 0, TILESIZE, TILESIZE)

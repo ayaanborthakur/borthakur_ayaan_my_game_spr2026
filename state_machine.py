@@ -65,6 +65,30 @@ class Idle(State):
         return "idle"
 
 
+class Airborne(State):
+    def __init__(self, active, player):
+        State.__init__(self, active, player)
+
+    def enter(self):
+        pass
+
+    def exit(self):
+        pass
+
+    def update(self):
+        #print("airborne")
+        pass
+
+    def get_name(self):
+        return "airborne"
+
+    def check(self):
+        if self.player.vel.y !=0:
+            
+            self.active = True
+        
+
+
 class StateMachine:
     def __init__(self):
 
@@ -91,8 +115,9 @@ class StateMachine:
             state.check()
             if state.active:
                 state.update()
+        self.requestedStates = {}
 
     def stateManage(self, statename, bool):
 
-        if statename() in self.states:
-            self.requestedStates[statename()] = bool
+        if statename in self.states:
+            self.requestedStates[statename] = bool

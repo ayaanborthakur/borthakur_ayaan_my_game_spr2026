@@ -7,6 +7,7 @@ from sprites import *
 from os import path
 from utils import *
 from math import floor
+import json
 
 
 # overview - CONCISE AND INFORMATIVE
@@ -33,7 +34,7 @@ class Game:
         self.coin_img = pg.image.load(
             path.join(self.img_dir, "coin.png")
         ).convert_alpha()
-        self.map = Map(path.join(self.game_dir, "level1.txt"))
+       
 
     def new(self):
         # creating all the sprites and mobs and walls
@@ -42,21 +43,78 @@ class Game:
         self.all_walls = pg.sprite.Group()
         self.all_coins = pg.sprite.Group()
         self.all_mobs = pg.sprite.Group()
-        self.all_mobs.add(Mob(self, 10, 10))
+        # self.all_mobs.add(Mob(self, 10, 10))
 
-        for row, tiles in enumerate(self.map.data):
-            for col, tile in enumerate(tiles):
-                if tile == "1":
-                    self.all_walls.add(Wall(self, col, row))
+        self.load_map()
 
-                if tile == "c":
-                    self.all_coins.add(Coin(self, col, row))
-            for col, tile in enumerate(tiles):
-                if tile == "a":
-                    self.player1 = Player1(self, col, row)
+        # for row, tiles in enumerate(self.map.data):
+        #     for col, tile in enumerate(tiles):
+        #         if tile == "1":
+        #             self.all_walls.add(Wall(self, col, row))
+        #
+        #         if tile == "c":
+        #             self.all_coins.add(Coin(self, col, row))
+        #     for col, tile in enumerate(tiles):
+        #         if tile == "a":
+        #             self.player1 = Player1(self, col, row)
+        #
+        #         if tile == "b":
+        #             self.player2 = Player2(self, col, row)
 
-                if tile == "b":
-                    self.player2 = Player2(self, col, row)
+    def load_map(self):
+        map_path = path.join(self.game_dir, "maps", "main_map.json")
+        with open(map_path, "r") as f:
+            map_data = json.load(f)
+
+        walls_layer = None
+        sprites_layer = None
+        for layer in map_data.get("layers", []):
+            if layer["name"] == "walls":
+                walls_layer = layer
+            elif layer["name"] == "sprites":
+                sprites_layer = layer
+
+        if walls_layer:
+            # Algorithm to find the farthest wall (max col and max row)
+            max_col = -1
+            max_row = -1
+            for chunk in walls_layer.get("chunks", []):
+                for i, tile in enumerate(chunk["data"]):
+                    # non-zero means wall
+                    if tile == 1:
+                        col = chunk["x"] + (i % chunk["width"])
+                        row = chunk["y"] + (i // chunk["width"])
+                        max_col = max(max_col, col)
+                        max_row = max(max_row, row)
+            
+            # Instantiate walls up to max_col and max_row
+            for chunk in walls_layer.get("chunks", []):
+                for i, tile in enumerate(chunk["data"]):
+                    if tile == 1:
+                        col = chunk["x"] + (i % chunk["width"])
+                        row = chunk["y"] + (i // chunk["width"])
+                        if col <= max_col and row <= max_row:
+                            self.all_walls.add(Wall(self, col * TILESIZE, row * TILESIZE))
+
+        if sprites_layer:
+            for obj in sprites_layer.get("objects", []):
+                
+                grid_x = obj["x"]
+                grid_y = obj["y"]
+                
+                if obj["type"] == "Player":
+                    if obj["name"] == "player1":
+                        self.player1 = Player1(self, grid_x, grid_y)
+                    elif obj["name"] == "player2":
+                        self.player2 = Player2(self, grid_x, grid_y)
+                elif obj["type"] == "Mob":
+                    self.all_mobs.add(Mob(self, grid_x, grid_y))
+        
+        # Failsafe if player 1 or 2 are missing in map JSON
+        if not hasattr(self, 'player1'):
+            self.player1 = Player1(self, 10, 10)
+        if not hasattr(self, 'player2'):
+            self.player2 = Player2(self, 12, 10)
 
     def run(self):
         # runs the game
@@ -101,14 +159,7 @@ class Game:
 
     def draw(self):
         self.screen.fill(WHITE)
-        self.draw_text(
-            self.screen,
-            str(pg.time.get_ticks() - self.cooldown.start_time),
-            24,
-            BLACK,
-            500,
-            100,
-        )
+        
         self.left_side.fill(WHITE)
         self.right_side.fill(WHITE)
         self.player1.camera.update()

@@ -97,9 +97,15 @@ def swept_aabb_collide(sprite, group):
         sprite.pos = start + sprite.vel * closest_t
 
         remaining = sprite.vel * (1.0 - closest_t)
-        slide = remaining - remaining.dot(hit_normal) * hit_normal
-        sprite.vel = slide
+        # ONLY apply slide if moving TOWARDS the wall (dot product < 0)
+        if remaining.dot(hit_normal) < 0:
+            slide = remaining - remaining.dot(hit_normal) * hit_normal
+            sprite.vel = slide
+        if hit_normal == vec(0,-1):
+            sprite.state_machine.stateManage("airborne",False)
+            print("airborne",False,sprite.pos.y)
 
+        
 
 class Player(Sprite):
 
@@ -114,11 +120,11 @@ class Player(Sprite):
         # physics vectors for acceleration postion and velocity
         self.accel = vec(0, 0)
         self.vel = vec(0, 0)
-        self.pos = vec(x, y) * TILESIZE
+        self.pos = vec(x, y)
         self.rect.center = self.pos
         self.last_update = 0
         self.current_frame = 0
-        self.states = []
+        
         self.spritesheet = Spritesheet(path.join(self.game.img_dir, "sprite_sheet.png"))
         self.load_images()
         self.camera = Camera(self, self.game)
@@ -128,9 +134,9 @@ class Player(Sprite):
     def update(self):
         # get keys and check if character is even moving
 
-        self.states = []
         is_moving = self.get_keys()
-        # applying acceleration to velocity and velocity to acceleration
+        # applying acceleration to velocity and velocity to accel
+        # eration
         try:
 
             self.accel = self.accel.normalize() * ACCELERATION
@@ -147,7 +153,6 @@ class Player(Sprite):
 
         # checking if its hitting anything else
         swept_aabb_collide(self, self.game.all_walls)
-
         self.pos += self.vel
         self.rect.center = self.pos
 
@@ -198,7 +203,10 @@ class Player(Sprite):
         keys = pg.key.get_pressed()
 
         value = False
-        if keys[pg.K_w]:
+        if keys[pg.K_w] and not self.state_machine.states["airborne"].active:
+            print("jumped")
+            self.state_machine.stateManage("airborne",True)
+
             self.vel.y = -JUMP_SPEED
 
         if keys[pg.K_a]:
@@ -214,107 +222,22 @@ class Player1(Player):
 
     def __init__(self, game, x, y):
         Player.__init__(self, game, x, y)
+    
 
-
-class Player2(Sprite):
+class Player2(Player):
 
     def __init__(self, game, x, y):
-        # intializes neccesary values
-        self.groups = game.all_sprites
-        Sprite.__init__(self, self.groups)
-        self.game = game
-        self.image = pg.Surface((TILESIZE, TILESIZE))
-        self.image.fill(BLACK)
-        self.rect = self.image.get_rect()
-        # physics vectors for acceleration postion and velocity
-        self.accel = vec(0, 0)
-        self.vel = vec(0, 0)
-        self.pos = vec(x, y) * TILESIZE
-        self.rect.center = self.pos
-        self.last_update = 0
-        self.current_frame = 0
-        self.states = []
-        self.spritesheet = Spritesheet(path.join(self.game.img_dir, "sprite_sheet.png"))
-        self.load_images()
-        self.camera = Camera(self, self.game)
-        self.state_machine = StateMachine()
-        self.state_machine.start_machine(PLAYER1_STATES(self))
-
-    def update(self):
-        # get keys and check if character is even moving
-        self.states = []
-        is_moving = self.get_keys()
-        # applying acceleration to velocity and velocity to acceleration
-        try:
-            self.accel = self.accel.normalize() * ACCELERATION
-
-            self.vel.x += self.accel.x
-
-            if abs(self.vel.x) >= PLAYER_SPEED:
-                self.vel.x = PLAYER_SPEED * (1 if self.vel.x > 0 else -1)
-
-        except:
-            pass
-
-        self.vel.y += GRAVITY
-
-        # checking if its hitting anything else
-        swept_aabb_collide(self, self.game.all_walls)
-
-        self.pos += self.vel
-        self.rect.center = self.pos
-
-        if not is_moving:
-            self.states.append("slowing")
-            self.vel.x *= 0.75
-            if abs(self.vel.x) <= 0.05:
-                self.states.append("standing")
-                self.vel.x = 0
-        else:
-            self.states.append("running")
-        self.state_machine.update()
-        self.accel *= 0
-        self.animate()
-
-    def load_images(self):
-        # loads images for the player
-        self.standing_frames = [
-            self.spritesheet.get_image(0, 0, TILESIZE, TILESIZE),
-            self.spritesheet.get_image(TILESIZE, 0, TILESIZE, TILESIZE),
-        ]
-        self.running_frames = [
-            self.spritesheet.get_image(0, TILESIZE, TILESIZE, TILESIZE),
-            self.spritesheet.get_image(TILESIZE, TILESIZE, TILESIZE, TILESIZE),
-        ]
-        # for frame in self.frames:
-        #    frame.set_colorkey(BLACK)
-
-    def animate(self):
-        now = pg.time.get_ticks()
-
-        if now - self.last_update > 75:
-            self.last_update = now
-            center = self.rect.center
-            if self.state_machine.states["running"].active:
-                self.current_frame = (self.current_frame + 1) % len(self.running_frames)
-                self.image = self.running_frames[self.current_frame]
-            elif self.state_machine.states["idle"].active:
-                self.current_frame = (self.current_frame + 1) % len(
-                    self.standing_frames
-                )
-                self.image = self.standing_frames[self.current_frame]
-
-            self.rect = self.image.get_rect()
-            self.rect.center = center
+        Player.__init__(self, game, x, y)
 
     def get_keys(self):
         # gets keys and stuff
         keys = pg.key.get_pressed()
 
         value = False
-        if keys[pg.K_UP]:
+        if keys[pg.K_UP] and not self.state_machine.states["airborne"].active:
             self.vel.y = -JUMP_SPEED
             value = True
+            self.state_machine.stateManage("airborne",True)
         if keys[pg.K_LEFT]:
             self.accel.x -= ACCELERATION
             value = True
@@ -335,7 +258,8 @@ class Mob(Sprite):
         self.rect = self.image.get_rect()
         self.accel = vec(0, 0)
         self.vel = vec(0, 0)
-        self.pos = vec(x * 32, y * 32)
+        self.pos = vec(x, y)
+        self.state_machine = StateMachine()
         # self.pos = vec(x,y) * TILESIZE[1]
 
     def update(self):
@@ -374,16 +298,13 @@ class Wall(Sprite):
         Sprite.__init__(self, self.groups)
         self.game = game
         self.image = pg.Surface((TILESIZE, TILESIZE))
-        self.image.blit(
-            pg.transform.scale(game.wall_img, (TILESIZE, TILESIZE)),
-            (0, 0),
-            (x, y, TILESIZE, TILESIZE),
-        )
-        self.image.fill(BLACK)
+        self.image.blit(game.wall_img, (0, 0), (0, 0, TILESIZE, TILESIZE))
+
         self.rect = self.image.get_rect()
 
         self.vel = vec(0, 0)
-        self.pos = vec((x * TILESIZE) + 16, (y * TILESIZE) + 16)
+
+        self.pos = vec(x+TILESIZE/2, y+TILESIZE/2)
         # self.pos = vec(x,y) * TILESIZE[1]
 
     def update(self):
@@ -400,7 +321,7 @@ class Coin(Sprite):
         self.rect = self.image.get_rect()
 
         self.vel = vec(0, 0)
-        self.pos = vec((x * TILESIZE) + 16, (y * TILESIZE) + 16)
+        self.pos = vec(x+TILESIZE/2, y+TILESIZE/2)
         # self.pos = vec(x,y) * TILESIZE[1]
 
     def update(self):
