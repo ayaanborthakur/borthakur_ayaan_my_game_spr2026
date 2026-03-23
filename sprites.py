@@ -9,7 +9,7 @@ from utils import *
 vec = pg.math.Vector2
 
 
-EPSILON = 0  # sub-pixel gap to prevent sticking, but doesn't work
+EPSILON = 0.1  # small gap to prevent inclusive-edge vibration
 
 
 def swept_aabb_collide(sprite, group):
@@ -46,16 +46,17 @@ def swept_aabb_collide(sprite, group):
 
             min_pen = min(dx_left, dx_right, dy_top, dy_bottom)
             if min_pen == dx_left:
-                sprite.pos.x = inflated.left
+                sprite.pos.x = inflated.left - EPSILON
                 sprite.vel.x = min(sprite.vel.x, 0)
             elif min_pen == dx_right:
-                sprite.pos.x = inflated.right
+                sprite.pos.x = inflated.right + EPSILON
                 sprite.vel.x = max(sprite.vel.x, 0)
             elif min_pen == dy_top:
-                sprite.pos.y = inflated.top
+                sprite.pos.y = inflated.top - EPSILON
                 sprite.vel.y = min(sprite.vel.y, 0)
+                sprite.state_machine.stateManage("airborne", False)
             elif min_pen == dy_bottom:
-                sprite.pos.y = inflated.bottom
+                sprite.pos.y = inflated.bottom + EPSILON
                 sprite.vel.y = max(sprite.vel.y, 0)
 
             start = vec(sprite.pos)
@@ -98,9 +99,19 @@ def swept_aabb_collide(sprite, group):
 
         remaining = sprite.vel * (1.0 - closest_t)
         # ONLY apply slide if moving TOWARDS the wall (dot product < 0)
+        if hit_normal == vec(0,1):
+            sprite.vel.y = max(0,sprite.vel.y)
+        if hit_normal == vec(0,-1):
+            sprite.vel.y = min(0,sprite.vel.y)
+        if hit_normal == vec(1,0):
+            sprite.vel.x = max(0,sprite.vel.x)
+        if hit_normal == vec(-1,0):
+            sprite.vel.x = min(0,sprite.vel.x)
+        """
         if remaining.dot(hit_normal) < 0:
             slide = remaining - remaining.dot(hit_normal) * hit_normal
             sprite.vel = slide
+        """
         if hit_normal == vec(0,-1):
             sprite.state_machine.stateManage("airborne",False)
             print("airborne",False,sprite.pos.y)
