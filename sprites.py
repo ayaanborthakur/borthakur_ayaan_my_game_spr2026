@@ -9,114 +9,198 @@ from utils import *
 vec = pg.math.Vector2
 
 
-EPSILON = 0.1  # small gap to prevent inclusive-edge vibration
+
+
+SKIN_WIDTH = 0.001  # tiny gap that prevents flush floating-point sticking
+#saw this online so i tried it. apperantly it makes sure when there are multiple collisons
+#like a corner, multiple iterations are gooder
+MAX_SWEEP_ITERATIONS = 3
+
+
+def _sweep_single(pos, velocity, sprite_rect, wall_rect):
+    """
+    eaycast the sprite center point along velocity against the mickey mouse walls
+
+
+    """
+    # nuild the minkowski "mickey mouse"-inflated AABB
+    half_w = sprite_rect.width / 2.0
+    half_h = sprite_rect.height / 2.0
+
+    mn_left   = wall_rect.left   - half_w
+    mn_right  = wall_rect.right  + half_w
+    mn_top    = wall_rect.top    - half_h
+    mn_bottom = wall_rect.bottom + half_h
+
+    INF = float('inf')
+
+    # ── X axis ──
+    if velocity.x == 0:
+        if pos.x <= mn_left or pos.x >= mn_right:
+            return 1.0, None         
+        tx_near = -INF
+        tx_far  =  INF
+    else:
+        tx_near = (mn_left  - pos.x) / velocity.x
+        tx_far  = (mn_right - pos.x) / velocity.x
+        if tx_near > tx_far:
+            tx_near, tx_far = tx_far, tx_near
+
+   
+    if velocity.y == 0:
+        if pos.y <= mn_top or pos.y >= mn_bottom:
+            return 1.0, None
+        ty_near = -INF
+        ty_far  =  INF
+    else:
+        ty_near = (mn_top    - pos.y) / velocity.y
+        ty_far  = (mn_bottom - pos.y) / velocity.y
+        if ty_near > ty_far:
+            ty_near, ty_far = ty_far, ty_near
+
+  
+  
+    if tx_near > ty_far or ty_near > tx_far:
+        return 1.0, None             
+
+    t_near = max(tx_near, ty_near)   
+    t_far  = min(tx_far,  ty_far)     
+
+    if t_near >= 1.0 or t_far <= 0:
+        return 1.0, None
+
+    toi = max(t_near, 0.0)            
+
+    if tx_near > ty_near:
+        normal = vec(-1, 0) if velocity.x > 0 else vec(1, 0)
+    elif ty_near > tx_near:
+        normal = vec(0, -1) if velocity.y > 0 else vec(0, 1)
+    else:
+        if abs(velocity.x) > abs(velocity.y):
+            normal = vec(-1, 0) if velocity.x > 0 else vec(1, 0)
+        else:
+            normal = vec(0, -1) if velocity.y > 0 else vec(0, 1)
+
+    return toi, normal
+
+"""
+100% ai made function, was just for testing. not used in the code.
+"""
+def _resolve_overlaps(sprite, group):
+    """
+    Discrete overlap check (SAT-lite for AABBs).
+    If the sprite is already inside any wall, push it out along the
+    shortest penetration axis *before* sweeping.
+    """
+    half_w = sprite.rect.width  / 2.0
+    half_h = sprite.rect.height / 2.0
+
+    for wall in group:
+        # Build Minkowski-inflated rect (same as in _sweep_single)
+        mn_left   = wall.rect.left   - half_w
+        mn_right  = wall.rect.right  + half_w
+        mn_top    = wall.rect.top    - half_h
+        mn_bottom = wall.rect.bottom + half_h
+
+        # Is the sprite center inside the inflated box?
+        if not (mn_left < sprite.pos.x < mn_right and
+                mn_top  < sprite.pos.y < mn_bottom):
+            continue
+
+        # Compute penetration depths on each side
+        pen_left   = sprite.pos.x - mn_left
+        pen_right  = mn_right  - sprite.pos.x
+        pen_top    = sprite.pos.y - mn_top
+        pen_bottom = mn_bottom - sprite.pos.y
+
+        min_pen = min(pen_left, pen_right, pen_top, pen_bottom)
+
+        if min_pen == pen_left:
+            sprite.pos.x = mn_left - SKIN_WIDTH
+            sprite.vel.x = min(sprite.vel.x, 0)
+        elif min_pen == pen_right:
+            sprite.pos.x = mn_right + SKIN_WIDTH
+            sprite.vel.x = max(sprite.vel.x, 0)
+        elif min_pen == pen_top:
+            sprite.pos.y = mn_top - SKIN_WIDTH
+            sprite.vel.y = min(sprite.vel.y, 0)
+            # Landing on a floor
+            if hasattr(sprite, 'state_machine'):
+                sprite.state_machine.stateManage("airborne", False)
+        elif min_pen == pen_bottom:
+            sprite.pos.y = mn_bottom + SKIN_WIDTH
+            sprite.vel.y = max(sprite.vel.y, 0)
 
 
 def swept_aabb_collide(sprite, group):
     """
-    Swept AABB collision
-    inflate walls by size of player
-    check if vector of player drawn from player center hits the wall
-    move to the hit position closest to the center
-
+    Full swept AABB collision: resolves overlaps, then iteratively
+    sweeps the sprite through the world with smooth sliding
+    
     """
-    # sprite glitchs on left and top walls
-    if sprite.vel.length_squared() == 0:
+ 
+    if sprite.vel.x == 0 and sprite.vel.y == 0:
         return
 
-    start = vec(sprite.pos)
-    end = start + sprite.vel
+    #_resolve_overlaps(sprite, group)
 
-    closest_t = 1.0  # fraction of velocity before first hit (1.0 = no hit)
-    hit_normal = None
+    time_remaining = 1.0
+    velocity = vec(sprite.vel)   # working copy for this frame
 
-    for wall in group:
+    for i in range(MAX_SWEEP_ITERATIONS):
+        if time_remaining <= 0:
+            break
 
-        inflated = wall.rect.inflate(sprite.rect.width, sprite.rect.height)
+        # Scale velocity to the remaining fraction of the frame
+        step_vel = velocity * time_remaining
 
-        if (
-            inflated.left < start.x < inflated.right
-            and inflated.top < start.y < inflated.bottom
-        ):
-            # Push out: find smallest penetration axis and resolve
-            dx_left = start.x - inflated.left
-            dx_right = inflated.right - start.x
-            dy_top = start.y - inflated.top
-            dy_bottom = inflated.bottom - start.y
+        # Skip if effectively zero movement left
+        if step_vel.length_squared() < 0.0001:
+            break
 
-            min_pen = min(dx_left, dx_right, dy_top, dy_bottom)
-            if min_pen == dx_left:
-                sprite.pos.x = inflated.left - EPSILON
-                sprite.vel.x = min(sprite.vel.x, 0)
-            elif min_pen == dx_right:
-                sprite.pos.x = inflated.right + EPSILON
-                sprite.vel.x = max(sprite.vel.x, 0)
-            elif min_pen == dy_top:
-                sprite.pos.y = inflated.top - EPSILON
-                sprite.vel.y = min(sprite.vel.y, 0)
+        # Find the closest collision across all walls
+        best_toi = 1.0
+        best_normal = None
+
+        for wall in group:
+            toi, normal = _sweep_single(sprite.pos, step_vel,
+                                        sprite.rect, wall.rect)
+            if toi < best_toi:
+                best_toi = toi
+                best_normal = normal
+
+        if best_normal is None or best_toi >= 1.0:
+            # ── No collision: apply full remaining movement ──
+            sprite.pos += step_vel
+            break
+        else:
+            # ── Collision found ──
+            # Move to impact point minus skin width
+            move_t = max(best_toi - SKIN_WIDTH, 0.0)
+            sprite.pos += step_vel * move_t
+
+            time_remaining -= best_toi * time_remaining
+
+            
+            dot = velocity.dot(best_normal)
+            if dot < 0:
+                velocity = velocity - (best_normal * dot)
+
+          
+            if best_normal.x != 0:
+                sprite.vel.x = 0
+            if best_normal.y != 0:
+                sprite.vel.y = 0
+
+            # reset jump
+            if best_normal.y == -1 and hasattr(sprite, 'state_machine'):
                 sprite.state_machine.stateManage("airborne", False)
-            elif min_pen == dy_bottom:
-                sprite.pos.y = inflated.bottom + EPSILON
-                sprite.vel.y = max(sprite.vel.y, 0)
 
-            start = vec(sprite.pos)
-            end = start + sprite.vel
-            continue
+            # If the sliding velocity is negligible, stop early
+            if velocity.length_squared() < 0.0001:
+                break
 
-        clipped = inflated.clipline(start, end)
 
-        if clipped:
-            hit_pt = vec(clipped[0])
-            dist = (hit_pt - start).length()
-            total = sprite.vel.length()
-            if total > 0:
-                t = dist / total
-                if t < closest_t:
-                    closest_t = t
-
-                    # Determine collision normal from inflated rect edges
-                    normal = vec(0, 0)
-                    eps = 1.0  # tolerance for edge detection
-                    if abs(hit_pt.x - inflated.left) < eps:
-                        normal = vec(-1, 0)
-                    elif abs(hit_pt.x - inflated.right) < eps:
-                        normal = vec(1, 0)
-                    elif abs(hit_pt.y - inflated.top) < eps:
-                        normal = vec(0, -1)
-                    elif abs(hit_pt.y - inflated.bottom) < eps:
-                        normal = vec(0, 1)
-                    hit_normal = normal
-
-    if hit_normal is not None:
-        # move to the collision point (epsilon commented out for now)
-        # vel_len = sprite.vel.length()
-        # if vel_len > 0:
-        #     pull_t = EPSILON / vel_len
-        #     adjusted_t = max(0, closest_t - pull_t)
-        # else:
-        #     adjusted_t = closest_t
-        sprite.pos = start + sprite.vel * closest_t
-
-        remaining = sprite.vel * (1.0 - closest_t)
-        # ONLY apply slide if moving TOWARDS the wall (dot product < 0)
-        if hit_normal == vec(0,1):
-            sprite.vel.y = max(0,sprite.vel.y)
-        if hit_normal == vec(0,-1):
-            sprite.vel.y = min(0,sprite.vel.y)
-        if hit_normal == vec(1,0):
-            sprite.vel.x = max(0,sprite.vel.x)
-        if hit_normal == vec(-1,0):
-            sprite.vel.x = min(0,sprite.vel.x)
-        """
-        if remaining.dot(hit_normal) < 0:
-            slide = remaining - remaining.dot(hit_normal) * hit_normal
-            sprite.vel = slide
-        """
-        if hit_normal == vec(0,-1):
-            sprite.state_machine.stateManage("airborne",False)
-            print("airborne",False,sprite.pos.y)
-
-        
 
 class Player(Sprite):
 
@@ -163,8 +247,8 @@ class Player(Sprite):
         self.vel.y += GRAVITY
 
         # checking if its hitting anything else
+        # swept_aabb_collide moves sprite.pos internally, do NOT add vel again
         swept_aabb_collide(self, self.game.all_walls)
-        self.pos += self.vel
         self.rect.center = self.pos
 
         if not is_moving:
@@ -294,7 +378,6 @@ class Mob(Sprite):
             pass
 
         swept_aabb_collide(self, self.game.all_walls)
-        self.pos += self.vel
         self.rect.center = self.pos
 
     # gets teh neccesrary accleration to get to the player

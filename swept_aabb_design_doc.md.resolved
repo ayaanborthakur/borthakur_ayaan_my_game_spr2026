@@ -1,0 +1,118 @@
+# Swept AABB Collision Detection: Comprehensive Implementation Plan
+
+This document serves as a detailed, multi-page guide and implementation plan for creating a robust Swept Axis-Aligned Bounding Box (AABB) collision system. It covers the core mathematics, the advanced response logic for smooth sliding, edge case resolution, and draws inspiration from industry-standard engines like Unity.
+
+---
+
+## Part 1: Introduction to Continuous Collision Detection (CCD)
+
+### 1.1 The Problem: Tunneling in Discrete Collision Detection
+Standard (discrete) collision detection evaluates intersections at specific, static frames. If an object moves fast enough—or if the frame rate drops—its position in frame `N` might be completely on one side of a wall, and in frame `N+1`, it might be completely on the other side. Because the object was never physically intersecting the wall at the moment of evaluation, the collision is missed entirely. This phenomenon is known as "tunneling."
+
+### 1.2 The Solution: Swept AABB
+Swept AABB is a Continuous Collision Detection (CCD) method. Instead of checking a static position, it extrudes (sweeps) the bounding box along its velocity vector over the course of the frame. This creates a volume that represents the object's entire path. If this volume intersects with another object, a collision is guaranteed to be caught, regardless of speed.
+
+### 1.3 How Big Engines Do It: Unity's Approach
+Unity uses two primary forms of Continuous Collision Detection to solve tunneling:
+1.  **Sweep-based CCD (Continuous / Continuous Dynamic):** Unity uses a Time-Of-Impact (TOI) algorithm. It projects the object's broad-phase bounding box along its linear velocity. This is conceptually identical to the Swept AABB algorithm. It calculates exactly *when* (a fraction between 0.0 and 1.0) and *where* the bounding boxes first touch.
+2.  **Speculative CCD:** Unity expands the object's AABB based on its velocity to include all space it *might* cover, then feeds all potential contacts to the physics solver to ensure constraints aren't violated. 
+
+For our custom 2D/3D kinematic movement, we will implement a robust variant of **Sweep-based CCD** using the Time-Of-Impact (TOI) approach via Minkowski Sums.
+
+---
+
+## Part 2: Core Mathematical Foundation
+
+To efficiently calculate when a moving AABB (the Player) hits a static AABB (the Wall), we simplify the problem visually and mathematically using an operation called the **Minkowski Sum**.
+
+### 2.1 The Minkowski Sum & Core Concept
+Instead of testing a moving box against a static box, we:
+1.  **Shrink the Player** to a single point (its center).
+2.  **Inflate the Wall** by the dimensions of the Player (width and height).
+
+Now, the problem is reduced to **Raycasting**: we cast a ray from the Player's starting center point along its velocity vector against this newly inflated static rectangle (the Minkowski box). 
+
+### 2.2 Time of Impact (TOI) and Collision Normal
+By raycasting against the Minkowski box, we can calculate the **Time of Impact (TOI)**.
+*   **TOI** is a scalar float between `0.0` (start of the frame) and `1.0` (end of the frame).
+*   If `TOI < 1.0`, a collision will happen *during* this frame.
+*   If `TOI >= 1.0` or `< 0.0`, no collision will occur during this frame's movement.
+
+Simultaneously, we determine which side of the inflated box the ray hit first (Left, Right, Top, or Bottom). This gives us the **Collision Normal** (e.g., `(-1, 0)` for hitting the right side of a wall, `(0, -1)` for hitting the top). 
+
+The Collision Normal is critical: it tells us the orientation of the surface we just hit so we can properly bounce or slide.
+
+---
+
+## Part 3: Collision Resolution & Smooth Sliding
+
+Just detecting the collision isn't enough; the object must react naturally. If a player runs diagonally into a wall, they shouldn't just stop instantly (which feels "sticky" and jerky). They need to slide smoothly along the wall.
+
+### 3.1 Moving to the Point of Impact
+Once a collision is detected with a specific `TOI` and `normal`:
+1.  We move the player along their velocity by `TOI`.
+2.  However, moving *exactly* to `TOI` puts the player theoretically flush against the wall. Floating-point errors will immediately register an intersection on the *next* frame.
+3.  **The Solution (Skin Width):** We stop the player slightly *short* of the exact impact point. We subtract a tiny epsilon value (e.g., `0.001`) from the movement so the player rests a microscopic distance away from the wall.
+
+### 3.2 Vector Projection for Smooth Sliding
+Upon hitting the wall, the player still has remaining time in the frame: `remaining_time = 1.0 - TOI`. They also have remaining velocity.
+To slide, we must remove the component of the velocity that goes *into* the wall, while keeping the component that moves *parallel* to the wall.
+
+We achieve this using **Vector Projection** (using the Dot Product):
+1.  Calculate how much velocity is pointing directly into the surface normal:
+    `velocity_into_wall = DotProduct(velocity, normal)`
+2.  Subtract that perpendicular velocity from the overall velocity:
+    `slide_velocity = velocity - (normal * velocity_into_wall)`
+
+This resulting `slide_velocity` is purely tangential to the wall. The player smoothly glides along the surface without losing forward momentum or hitching.
+
+---
+
+## Part 4: Handling Edge Cases (Preventing Jerkiness)
+
+A naive Swept AABB implementation breaks quickly in a grid-based or multi-collider environment. Here is how we address the critical edge cases:
+
+### 4.1 Initial Overlap (Being "Stuck" Inside)
+*   **The Problem:** Swept AABB relies on objects starting *outside* of each other. If a player spawns inside a wall, or gets pushed inside due to a moving platform, the TOI calculation yields unpredictable results (often negative or zero).
+*   **The Solution:** At the start of the physics step, perform a discrete AABB intersection check. If overlapping, use the Separating Axis Theorem (SAT) to immediately calculate the shortest penetration depth and push the player out. *Only after resolving initial overlap* do we run the Swept AABB logic for the frame's movement.
+
+### 4.2 The "Corner Catch" / Internal Edges (The Tile Problem)
+*   **The Problem:** When moving along a floor made of multiple adjacent tile blocks, the player might perfectly slide across Tile A, but their microscopic skin width catches on the infinitely sharp edge of Tile B, halting momentum entirely.
+*   **The Solution:** 
+    1.  **Sub-stepping (Iteration Limit):** The sweep algorithm must loop. After hitting Tile A, calculate sliding velocity, and sweep *again* for the remaining time. Repeat up to a max iterations limit (e.g., 3 defaults).
+    2.  **Prioritization:** Collect all potential collisions in the scene before moving. Sort them by `TOI` ascending. Always resolve the closest collision first. If two blocks have identical TOI, resolve the one whose normal directly opposes the greatest vector component of the velocity.
+
+### 4.3 High-Speed Tunneling Through Thin Walls
+*   **The Problem:** If velocity is extremely massive, the Minkowski Minkowski box raycast might still suffer floating constraints if the wall is microscopic in thickness.
+*   **The Solution:** Ensure the Time of Impact calculation incorporates proper division-by-zero safeguards and checks the entry *and* exit times (t_near and t_far) of the raycast against the Minkowski bounds. t_near must be < t_far, and t_near must be < 1.0 for a valid hit.
+
+### 4.4 Zero Velocity
+*   **The Problem:** If velocity is exactly `(0, 0)`, raycasting equations will attempt to divide by zero when calculating TOI.
+*   **The Solution:** Add a fast-fail check at the very beginning of the swept routine. If `velocity.x == 0 and velocity.y == 0`, immediately return no collision.
+
+---
+
+## Part 5: Step-by-Step Logic Flow
+
+To implement this into your game (e.g., in Pygame or a custom engine), follow this exact execution flow every single frame:
+
+1.  **Calculate Desired Movement:** Calculate `velocity = (input_x, input_y) * speed * dt`. Apply gravity if applicable.
+2.  **Broad-Phase Filtering:** Gather only the walls/colliders that are relatively close to the player to save CPU cycles.
+3.  **Resolve Initial Overlaps:** Check if the player AABB intersects any wall AABB *before* moving. If yes, push the player out along the shortest axis.
+4.  ** swept_collision_loop (Max 3-5 Iterations):**
+    *   Initialize `time_remaining = 1.0`
+    *   While `time_remaining > 0` and `iterations < MAX_ITERATIONS`:
+        *   Find the **First Impact**: Loop through all nearby walls. For each wall, calculate `TOI` and `normal` against the player's current position and `velocity * time_remaining`.
+        *   Keep track of the wall with the **lowest TOI** that is > 0.
+        *   If no collision found (or TOI >= 1.0):
+            *   Move player by entire `velocity * time_remaining`.
+            *   Break loop.
+        *   If collision found (TOI < 1.0):
+            *   Move player by `velocity * (TOI - epsilon)`. (The epsilon prevents sticking).
+            *   Update `time_remaining = time_remaining - (TOI * time_remaining)`.
+            *   Calculate new sliding velocity: `velocity = velocity - dot(velocity, normal) * normal`.
+            *   If `velocity` is near zero, break early.
+            *   Increment `iterations`.
+5.  **Finalize Position:** The player's bounding box is now securely at the most valid position for this frame.
+
+By strictly following this layered approach—discrete separation first, followed by an iterative, TOI-sorted swept sweep with vector projection sliding—you achieve robust, Unity-grade, buttery-smooth collisions that will practically never snag or tunnel.
