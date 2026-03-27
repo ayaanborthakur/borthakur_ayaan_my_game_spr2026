@@ -9,11 +9,9 @@ from utils import *
 vec = pg.math.Vector2
 
 
-
-
 SKIN_WIDTH = 0.001  # tiny gap that prevents flush floating-point sticking
-#saw this online so i tried it. apperantly it makes sure when there are multiple collisons
-#like a corner, multiple iterations are gooder
+# saw this online so i tried it. apperantly it makes sure when there are multiple collisons
+# like a corner, multiple iterations are gooder
 MAX_SWEEP_ITERATIONS = 3
 
 
@@ -27,49 +25,46 @@ def _sweep_single(pos, velocity, sprite_rect, wall_rect):
     half_w = sprite_rect.width / 2.0
     half_h = sprite_rect.height / 2.0
 
-    mn_left   = wall_rect.left   - half_w
-    mn_right  = wall_rect.right  + half_w
-    mn_top    = wall_rect.top    - half_h
+    mn_left = wall_rect.left - half_w
+    mn_right = wall_rect.right + half_w
+    mn_top = wall_rect.top - half_h
     mn_bottom = wall_rect.bottom + half_h
 
-    INF = float('inf')
+    INF = float("inf")
 
     # ── X axis ──
     if velocity.x == 0:
         if pos.x <= mn_left or pos.x >= mn_right:
-            return 1.0, None         
+            return 1.0, None
         tx_near = -INF
-        tx_far  =  INF
+        tx_far = INF
     else:
-        tx_near = (mn_left  - pos.x) / velocity.x
-        tx_far  = (mn_right - pos.x) / velocity.x
+        tx_near = (mn_left - pos.x) / velocity.x
+        tx_far = (mn_right - pos.x) / velocity.x
         if tx_near > tx_far:
             tx_near, tx_far = tx_far, tx_near
 
-   
     if velocity.y == 0:
         if pos.y <= mn_top or pos.y >= mn_bottom:
             return 1.0, None
         ty_near = -INF
-        ty_far  =  INF
+        ty_far = INF
     else:
-        ty_near = (mn_top    - pos.y) / velocity.y
-        ty_far  = (mn_bottom - pos.y) / velocity.y
+        ty_near = (mn_top - pos.y) / velocity.y
+        ty_far = (mn_bottom - pos.y) / velocity.y
         if ty_near > ty_far:
             ty_near, ty_far = ty_far, ty_near
 
-  
-  
     if tx_near > ty_far or ty_near > tx_far:
-        return 1.0, None             
+        return 1.0, None
 
-    t_near = max(tx_near, ty_near)   
-    t_far  = min(tx_far,  ty_far)     
+    t_near = max(tx_near, ty_near)
+    t_far = min(tx_far, ty_far)
 
     if t_near >= 1.0 or t_far <= 0:
         return 1.0, None
 
-    toi = max(t_near, 0.0)            
+    toi = max(t_near, 0.0)
 
     if tx_near > ty_near:
         normal = vec(-1, 0) if velocity.x > 0 else vec(1, 0)
@@ -83,34 +78,38 @@ def _sweep_single(pos, velocity, sprite_rect, wall_rect):
 
     return toi, normal
 
+
 """
 100% ai made function, was just for testing. not used in the code.
 """
+
+
 def _resolve_overlaps(sprite, group):
     """
     Discrete overlap check (SAT-lite for AABBs).
     If the sprite is already inside any wall, push it out along the
     shortest penetration axis *before* sweeping.
     """
-    half_w = sprite.rect.width  / 2.0
+    half_w = sprite.rect.width / 2.0
     half_h = sprite.rect.height / 2.0
 
     for wall in group:
         # Build Minkowski-inflated rect (same as in _sweep_single)
-        mn_left   = wall.rect.left   - half_w
-        mn_right  = wall.rect.right  + half_w
-        mn_top    = wall.rect.top    - half_h
+        mn_left = wall.rect.left - half_w
+        mn_right = wall.rect.right + half_w
+        mn_top = wall.rect.top - half_h
         mn_bottom = wall.rect.bottom + half_h
 
         # Is the sprite center inside the inflated box?
-        if not (mn_left < sprite.pos.x < mn_right and
-                mn_top  < sprite.pos.y < mn_bottom):
+        if not (
+            mn_left < sprite.pos.x < mn_right and mn_top < sprite.pos.y < mn_bottom
+        ):
             continue
 
         # Compute penetration depths on each side
-        pen_left   = sprite.pos.x - mn_left
-        pen_right  = mn_right  - sprite.pos.x
-        pen_top    = sprite.pos.y - mn_top
+        pen_left = sprite.pos.x - mn_left
+        pen_right = mn_right - sprite.pos.x
+        pen_top = sprite.pos.y - mn_top
         pen_bottom = mn_bottom - sprite.pos.y
 
         min_pen = min(pen_left, pen_right, pen_top, pen_bottom)
@@ -125,7 +124,7 @@ def _resolve_overlaps(sprite, group):
             sprite.pos.y = mn_top - SKIN_WIDTH
             sprite.vel.y = min(sprite.vel.y, 0)
             # Landing on a floor
-            if hasattr(sprite, 'state_machine'):
+            if hasattr(sprite, "state_machine"):
                 sprite.state_machine.stateManage("airborne", False)
         elif min_pen == pen_bottom:
             sprite.pos.y = mn_bottom + SKIN_WIDTH
@@ -136,16 +135,16 @@ def swept_aabb_collide(sprite, group):
     """
     Full swept AABB collision: resolves overlaps, then iteratively
     sweeps the sprite through the world with smooth sliding
-    
+
     """
- 
+
     if sprite.vel.x == 0 and sprite.vel.y == 0:
         return
 
-    #_resolve_overlaps(sprite, group)
+    # _resolve_overlaps(sprite, group)
 
     time_remaining = 1.0
-    velocity = vec(sprite.vel)   # working copy for this frame
+    velocity = vec(sprite.vel)  # working copy for this frame
 
     for i in range(MAX_SWEEP_ITERATIONS):
         if time_remaining <= 0:
@@ -163,8 +162,7 @@ def swept_aabb_collide(sprite, group):
         best_normal = None
 
         for wall in group:
-            toi, normal = _sweep_single(sprite.pos, step_vel,
-                                        sprite.rect, wall.rect)
+            toi, normal = _sweep_single(sprite.pos, step_vel, sprite.rect, wall.rect)
             if toi < best_toi:
                 best_toi = toi
                 best_normal = normal
@@ -181,25 +179,22 @@ def swept_aabb_collide(sprite, group):
 
             time_remaining -= best_toi * time_remaining
 
-            
             dot = velocity.dot(best_normal)
             if dot < 0:
                 velocity = velocity - (best_normal * dot)
 
-          
             if best_normal.x != 0:
                 sprite.vel.x = 0
             if best_normal.y != 0:
                 sprite.vel.y = 0
 
             # reset jump
-            if best_normal.y == -1 and hasattr(sprite, 'state_machine'):
+            if best_normal.y == -1 and hasattr(sprite, "state_machine"):
                 sprite.state_machine.stateManage("airborne", False)
 
             # If the sliding velocity is negligible, stop early
             if velocity.length_squared() < 0.0001:
                 break
-
 
 
 class Player(Sprite):
@@ -219,12 +214,16 @@ class Player(Sprite):
         self.rect.center = self.pos
         self.last_update = 0
         self.current_frame = 0
-        
+
         self.spritesheet = Spritesheet(path.join(self.game.img_dir, "sprite_sheet.png"))
         self.load_images()
         self.camera = Camera(self, self.game)
         self.state_machine = StateMachine()
         self.state_machine.start_machine(Dino_STATES(self))
+        self.hitbox = pg.mask.from_surface(self.image)
+        self.all_attacks = []
+        self.basic_attack = self.BasicAttack(self)
+        self.animate()
 
     def update(self):
         # get keys and check if character is even moving
@@ -261,6 +260,7 @@ class Player(Sprite):
         self.state_machine.update()
         self.accel *= 0
         self.animate()
+        self.basic_attack.update()
 
     def load_images(self):
         # loads images for the player
@@ -300,10 +300,11 @@ class Player(Sprite):
         value = False
         if keys[pg.K_w] and not self.state_machine.states["airborne"].active:
             print("jumped")
-            self.state_machine.stateManage("airborne",True)
+            self.state_machine.stateManage("airborne", True)
 
             self.vel.y = -JUMP_SPEED
-
+        if keys[pg.K_f]:
+            self.basic_attack.attack()
         if keys[pg.K_a]:
             self.accel.x -= ACCELERATION
             value = True
@@ -312,12 +313,57 @@ class Player(Sprite):
             value = True
         return value
 
+    class BasicAttack(Sprite):
+        def __init__(self, player):
+            Sprite.__init__(self)
+
+            self.player = player
+            self.pos = self.player.pos
+
+            self.image = pg.Surface((0, 0))
+
+            self.spritesheet = Spritesheet(
+                path.join(self.player.game.img_dir, "attack.png")
+            )
+
+            self.hitbox = pg.mask.from_surface(self.image)
+
+            self.attacktimer = Cooldown(500)
+            self.attackcooldown = Cooldown(1000)
+            self.attackcooldown.start()
+            self.attacking = False
+
+        def update(self):
+            if self.attacktimer.ready() and self.attackcooldown.ready():
+                self.attackcooldown.start()
+
+            self.attacking = (
+                not self.attacktimer.ready() and self.attackcooldown.ready()
+            )
+            if self.attacking:
+                self.image = self.spritesheet.get_image(0, 0, 64, 64)
+                print("attacking big dawg")
+            else:
+                self.image = pg.Surface((0, 0))
+
+            self.rect = self.image.get_rect()
+            self.hitbox = pg.mask.from_surface(self.image)
+
+            self.pos = self.player.pos
+            self.rect.center = self.pos
+
+        def attack(self):
+            if self.attackcooldown.ready():
+
+                self.attacktimer.start()
+                self.attacking = True
+
 
 class Dino(Player):
 
     def __init__(self, game, x, y):
         Player.__init__(self, game, x, y)
-    
+
 
 class Alien(Player):
 
@@ -332,7 +378,7 @@ class Alien(Player):
         if keys[pg.K_UP] and not self.state_machine.states["airborne"].active:
             self.vel.y = -JUMP_SPEED
             value = True
-            self.state_machine.stateManage("airborne",True)
+            self.state_machine.stateManage("airborne", True)
         if keys[pg.K_LEFT]:
             self.accel.x -= ACCELERATION
             value = True
@@ -398,7 +444,7 @@ class Wall(Sprite):
 
         self.vel = vec(0, 0)
 
-        self.pos = vec(x+TILESIZE/2, y+TILESIZE/2)
+        self.pos = vec(x + TILESIZE / 2, y + TILESIZE / 2)
         # self.pos = vec(x,y) * TILESIZE[1]
 
     def update(self):
@@ -415,7 +461,7 @@ class Coin(Sprite):
         self.rect = self.image.get_rect()
 
         self.vel = vec(0, 0)
-        self.pos = vec(x+TILESIZE/2, y+TILESIZE/2)
+        self.pos = vec(x + TILESIZE / 2, y + TILESIZE / 2)
         # self.pos = vec(x,y) * TILESIZE[1]
 
     def update(self):
