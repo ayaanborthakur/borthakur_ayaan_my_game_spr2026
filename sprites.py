@@ -223,6 +223,8 @@ class Player(Sprite):
         self.hitbox = pg.mask.from_surface(self.image)
         self.all_attacks = []
         self.basic_attack = self.BasicAttack(self)
+        self.all_attacks.append(self.basic_attack)
+
         self.animate()
 
     def update(self):
@@ -261,6 +263,43 @@ class Player(Sprite):
         self.accel *= 0
         self.animate()
         self.basic_attack.update()
+        self.get_collisions()
+
+    def get_collisions(self):
+        for attack in self.game.dino.all_attacks:
+
+            if (
+                attack.player != self
+                and attack.attacking
+                and (
+                    self.hitbox.overlap(
+                        attack.hitbox,
+                        (
+                            int(attack.rect.left - self.rect.left),
+                            int(attack.rect.top - self.rect.top),
+                        ),
+                    )
+                )
+            ):
+                print("hit player")
+                self.kill()
+        for attack in self.game.alien.all_attacks:
+
+            if (
+                attack.player != self
+                and attack.attacking
+                and (
+                    self.hitbox.overlap(
+                        attack.hitbox,
+                        (
+                            int(attack.rect.left - self.rect.left),
+                            int(attack.rect.top - self.rect.top),
+                        ),
+                    )
+                )
+            ):
+                print("hit player")
+                self.kill()
 
     def load_images(self):
         # loads images for the player
@@ -303,7 +342,8 @@ class Player(Sprite):
             self.state_machine.stateManage("airborne", True)
 
             self.vel.y = -JUMP_SPEED
-        if keys[pg.K_f]:
+        if keys[pg.K_q]:
+            print("attacked")
             self.basic_attack.attack()
         if keys[pg.K_a]:
             self.accel.x -= ACCELERATION
@@ -315,9 +355,9 @@ class Player(Sprite):
 
     class BasicAttack(Sprite):
         def __init__(self, player):
-            Sprite.__init__(self)
-
             self.player = player
+            Sprite.__init__(self, self.player.game.all_sprites)
+
             self.pos = self.player.pos
 
             self.image = pg.Surface((0, 0))
@@ -328,25 +368,23 @@ class Player(Sprite):
 
             self.hitbox = pg.mask.from_surface(self.image)
 
-            self.attacktimer = Cooldown(500)
-            self.attackcooldown = Cooldown(1000)
+            self.attacktimer = Cooldown(120)
+            self.attackcooldown = Cooldown(560)
             self.attackcooldown.start()
             self.attacking = False
 
         def update(self):
-            if self.attacktimer.ready() and self.attackcooldown.ready():
-                self.attackcooldown.start()
 
-            self.attacking = (
-                not self.attacktimer.ready() and self.attackcooldown.ready()
-            )
+            self.attacking = not self.attacktimer.ready()
             if self.attacking:
                 self.image = self.spritesheet.get_image(0, 0, 64, 64)
-                print("attacking big dawg")
+
             else:
                 self.image = pg.Surface((0, 0))
 
+            self.image.set_colorkey(BLACK)
             self.rect = self.image.get_rect()
+
             self.hitbox = pg.mask.from_surface(self.image)
 
             self.pos = self.player.pos
@@ -354,8 +392,10 @@ class Player(Sprite):
 
         def attack(self):
             if self.attackcooldown.ready():
+                print("attacking big dawg")
 
                 self.attacktimer.start()
+                self.attackcooldown.start()
                 self.attacking = True
 
 
@@ -379,6 +419,9 @@ class Alien(Player):
             self.vel.y = -JUMP_SPEED
             value = True
             self.state_machine.stateManage("airborne", True)
+        if keys[pg.K_RSHIFT]:
+            print("attacked")
+            self.basic_attack.attack()
         if keys[pg.K_LEFT]:
             self.accel.x -= ACCELERATION
             value = True
@@ -396,6 +439,7 @@ class Mob(Sprite):
         self.game = game
         self.image = pg.Surface((TILESIZE, TILESIZE))
         self.image.fill(GREEN)
+        self.hitbox = pg.mask.from_surface(self.image)
         self.rect = self.image.get_rect()
         self.accel = vec(0, 0)
         self.vel = vec(0, 0)
@@ -425,6 +469,20 @@ class Mob(Sprite):
 
         swept_aabb_collide(self, self.game.all_walls)
         self.rect.center = self.pos
+        for attack in self.game.dino.all_attacks:
+
+            if (
+                self.hitbox.overlap(
+                    attack.hitbox,
+                    (
+                        int(attack.rect.left - self.rect.left),
+                        int(attack.rect.top - self.rect.top),
+                    ),
+                )
+                and attack.attacking
+            ):
+                print("hit mob")
+                self.kill()
 
     # gets teh neccesrary accleration to get to the player
     def move(self, pos):
