@@ -76,17 +76,62 @@ class Airborne(State):
         pass
 
     def update(self):
-        #print("airborne")
+        # print("airborne")
         pass
 
     def get_name(self):
         return "airborne"
 
     def check(self):
-        if self.player.vel.y !=0:
-            
+        if self.player.vel.y != 0:
+
             self.active = True
-        
+
+
+class Dashing(State):
+    def __init__(self, active, player):
+        State.__init__(self, active, player)
+
+    def enter(self):
+        pass
+
+    def exit(self):
+        pass
+
+    def update(self):
+        # print("airborne")
+        pass
+
+    def get_name(self):
+        return "dashing"
+
+    def check(self):
+        if self.player.dash.active == True:
+
+            self.active = True
+
+
+class Attacking(State):
+    def __init__(self, active, player):
+        State.__init__(self, active, player)
+
+    def enter(self):
+        pass
+
+    def exit(self):
+        pass
+
+    def update(self):
+        # print("airborne")
+        pass
+
+    def get_name(self):
+        return "attacking"
+
+    def check(self):
+        if self.player.basic_attack.active == True:
+
+            self.active = True
 
 
 class StateMachine:

@@ -15,7 +15,7 @@ SKIN_WIDTH = 0.001  # tiny gap that prevents flush floating-point sticking
 MAX_SWEEP_ITERATIONS = 3
 
 
-def _sweep_single(pos, velocity, sprite_rect, wall_rect):
+def sweep_single(pos, velocity, sprite_rect, wall_rect):
     """
     eaycast the sprite center point along velocity against the mickey mouse walls
 
@@ -94,7 +94,7 @@ def _resolve_overlaps(sprite, group):
     half_h = sprite.rect.height / 2.0
 
     for wall in group:
-        # Build Minkowski-inflated rect (same as in _sweep_single)
+        # Build Minkowski-inflated rect (same as in sweep_single)
         mn_left = wall.rect.left - half_w
         mn_right = wall.rect.right + half_w
         mn_top = wall.rect.top - half_h
@@ -162,17 +162,15 @@ def swept_aabb_collide(sprite, group):
         best_normal = None
 
         for wall in group:
-            toi, normal = _sweep_single(sprite.pos, step_vel, sprite.rect, wall.rect)
+            toi, normal = sweep_single(sprite.pos, step_vel, sprite.rect, wall.rect)
             if toi < best_toi:
                 best_toi = toi
                 best_normal = normal
 
         if best_normal is None or best_toi >= 1.0:
-            # ── No collision: apply full remaining movement ──
             sprite.pos += step_vel
             break
         else:
-            # ── Collision found ──
             # Move to impact point minus skin width
             move_t = max(best_toi - SKIN_WIDTH, 0.0)
             sprite.pos += step_vel * move_t

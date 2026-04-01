@@ -20,7 +20,13 @@ SCORE = 0
 
 
 def Dino_STATES(player):
-    return [Running(False, player), Idle(True, player), Airborne(False, player)]
+    return [
+        Running(False, player),
+        Idle(True, player),
+        Airborne(False, player),
+        Dashing(False, player),
+        Attacking(False, player),
+    ]
 
 
 TITLE = "hello"
