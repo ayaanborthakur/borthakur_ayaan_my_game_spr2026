@@ -224,23 +224,19 @@ class Player(Sprite):
         self.all_attacks = []
         self.basic_attack = self.BasicAttack(self)
         self.all_attacks.append(self.basic_attack)
-
+        self.dash = self.Dash(self)
         self.animate()
 
     def update(self):
         # get keys and check if character is even moving
 
         is_moving = self.get_keys()
+        self.dash.update()
         # applying acceleration to velocity and velocity to accel
         # eration
         try:
 
-            self.accel = self.accel.normalize() * ACCELERATION
-
-            self.vel.x += self.accel.x
-
-            if abs(self.vel.x) >= PLAYER_SPEED:
-                self.vel.x = PLAYER_SPEED * (1 if self.vel.x > 0 else -1)
+            self.vel += self.accel
 
         except:
             pass
@@ -270,7 +266,7 @@ class Player(Sprite):
 
             if (
                 attack.player != self
-                and attack.attacking
+                and attack.active
                 and (
                     self.hitbox.overlap(
                         attack.hitbox,
@@ -287,7 +283,7 @@ class Player(Sprite):
 
             if (
                 attack.player != self
-                and attack.attacking
+                and attack.active
                 and (
                     self.hitbox.overlap(
                         attack.hitbox,
@@ -342,15 +338,28 @@ class Player(Sprite):
             self.state_machine.stateManage("airborne", True)
 
             self.vel.y = -JUMP_SPEED
+        if keys[pg.K_s]:
+            print("dashed")
+            self.dash.activate()
         if keys[pg.K_q]:
             print("attacked")
-            self.basic_attack.attack()
-        if keys[pg.K_a]:
-            self.accel.x -= ACCELERATION
-            value = True
-        if keys[pg.K_d]:
-            self.accel.x += ACCELERATION
-            value = True
+            self.basic_attack.activate()
+        if abs(self.vel.x) < PLAYER_SPEED:
+            if abs(self.vel.x) + ACCELERATION >= PLAYER_SPEED:
+                if keys[pg.K_a]:
+                    self.vel.x = -PLAYER_SPEED
+                    value = True
+                if keys[pg.K_d]:
+                    self.vel.x = PLAYER_SPEED
+                    value = True
+            else:
+                if keys[pg.K_a]:
+                    self.vel.x -= ACCELERATION
+
+                    value = True
+                if keys[pg.K_d]:
+                    self.vel.x += ACCELERATION
+                    value = True
         return value
 
     class BasicAttack(Sprite):
@@ -368,15 +377,15 @@ class Player(Sprite):
 
             self.hitbox = pg.mask.from_surface(self.image)
 
-            self.attacktimer = Cooldown(120)
-            self.attackcooldown = Cooldown(560)
-            self.attackcooldown.start()
-            self.attacking = False
+            self.activetimer = Cooldown(ATTACK_TIME)
+            self.activecooldown = Cooldown(ATTACK_COOLDOWN)
+            self.activecooldown.start()
+            self.active = False
 
         def update(self):
 
-            self.attacking = not self.attacktimer.ready()
-            if self.attacking:
+            self.active = not self.activetimer.ready()
+            if self.active:
                 self.image = self.spritesheet.get_image(0, 0, 64, 64)
 
             else:
@@ -390,13 +399,60 @@ class Player(Sprite):
             self.pos = self.player.pos
             self.rect.center = self.pos
 
-        def attack(self):
-            if self.attackcooldown.ready():
-                print("attacking big dawg")
+        def activate(self):
+            if self.activecooldown.ready():
+                print("active big dawg")
 
-                self.attacktimer.start()
-                self.attackcooldown.start()
-                self.attacking = True
+                self.activetimer.start()
+                self.activecooldown.start()
+                self.active = True
+
+    class Dash(Sprite):
+        def __init__(self, player):
+            self.player = player
+
+            self.pos = self.player.pos
+
+            """  self.image = pg.Surface((0, 0))
+
+            self.spritesheet = Spritesheet(
+                path.join(self.player.game.img_dir, "attack.png")
+            ) """
+
+            """ self.hitbox = pg.mask.from_surface(self.image) """
+
+            self.activetimer = Cooldown(DASH_TIME)
+            self.activecooldown = Cooldown(DASH_COOLDOWN)
+            self.activecooldown.start()
+            self.active = False
+
+        def update(self):
+
+            self.active = not self.activetimer.ready()
+            if self.active and self.player.vel.x != 0:
+                print("dashing big dawg")
+
+                self.player.vel.x += (
+                    self.player.vel.x / abs(self.player.vel.x) * DASH_SPEED
+                )
+
+            """ else:
+                self.image = pg.Surface((0, 0)) """
+
+            """ self.image.set_colorkey(BLACK)
+            self.rect = self.image.get_rect()
+
+            self.hitbox = pg.mask.from_surface(self.image) """
+
+            """ self.pos = self.player.pos
+            self.rect.center = self.pos """
+
+        def activate(self):
+            if self.activecooldown.ready():
+
+                self.activetimer.start()
+                self.activecooldown.start()
+                self.active = True
 
 
 class Dino(Player):
@@ -416,18 +472,32 @@ class Alien(Player):
 
         value = False
         if keys[pg.K_UP] and not self.state_machine.states["airborne"].active:
-            self.vel.y = -JUMP_SPEED
-            value = True
+            print("jumped")
             self.state_machine.stateManage("airborne", True)
+
+            self.vel.y = -JUMP_SPEED
+        if keys[pg.K_DOWN]:
+            print("dashed")
+            self.dash.activate()
         if keys[pg.K_RSHIFT]:
             print("attacked")
-            self.basic_attack.attack()
-        if keys[pg.K_LEFT]:
-            self.accel.x -= ACCELERATION
-            value = True
-        if keys[pg.K_RIGHT]:
-            self.accel.x += ACCELERATION
-            value = True
+            self.basic_attack.activate()
+        if abs(self.vel.x) < PLAYER_SPEED:
+            if abs(self.vel.x) + ACCELERATION >= PLAYER_SPEED:
+                if keys[pg.K_LEFT]:
+                    self.vel.x = -PLAYER_SPEED
+                    value = True
+                if keys[pg.K_RIGHT]:
+                    self.vel.x = PLAYER_SPEED
+                    value = True
+            else:
+                if keys[pg.K_LEFT]:
+                    self.vel.x -= ACCELERATION
+
+                    value = True
+                if keys[pg.K_RIGHT]:
+                    self.vel.x += ACCELERATION
+                    value = True
         return value
 
 
@@ -479,7 +549,7 @@ class Mob(Sprite):
                         int(attack.rect.top - self.rect.top),
                     ),
                 )
-                and attack.attacking
+                and attack.active
             ):
                 print("hit mob")
                 self.kill()

@@ -111,7 +111,6 @@ class Game:
                 elif obj["type"] == "Mob":
                     self.all_mobs.add(Mob(self, grid_x, grid_y))
 
-        # Failsafe if player 1 or 2 are missing in map JSON
         if not hasattr(self, "dino"):
             self.dino = Dino(self, 10, 10)
         if not hasattr(self, "alien"):
