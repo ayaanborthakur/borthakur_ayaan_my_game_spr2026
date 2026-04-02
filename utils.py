@@ -1,7 +1,9 @@
 from settings import *
 import pygame as pg
+import os.path as path
 
 # Object or class
+from pygame.sprite import Sprite
 
 vec = pg.math.Vector2
 
@@ -65,6 +67,34 @@ class Cooldown:
         if current_time - self.start_time >= self.time:
             return True
         return False
+
+
+class HealthBar(Sprite):
+    def __init__(self, player):
+        self.player = player
+        Sprite.__init__(self, self.player.game.all_sprites)
+
+        self.update()
+
+    def update(self):
+        index = self.player.health
+        percent = self.player.health / HEALTH
+
+        index = int(index /2)
+        bar_surf = pg.Surface((index, 10))
+        # 2. Fill it with color
+        bar_surf.fill((int(255 * (1 - percent)), int(255 * (percent)),50 ))
+        
+        # 3. Create the main image surface (the full 100-width bar)
+        self.image = pg.Surface((100, 20))
+        # 4. Fill it with a background color (optional, e.g., black)
+        # self.image.fill((0, 0, 0)) 
+        # 5. blit the health bar onto the main surface
+        self.image.blit(bar_surf, (25+25-index//2, 5))
+        self.image.set_colorkey(BLACK)
+        self.rect = self.image.get_rect()
+        self.rect.center = (self.player.pos.x, self.player.pos.y)
+        self.rect.top = self.player.rect.bottom
 
 
 # loads an image file and creates an image surface for blitting or drawing images on the surface

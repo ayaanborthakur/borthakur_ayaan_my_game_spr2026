@@ -212,7 +212,8 @@ class Player(Sprite):
         self.rect.center = self.pos
         self.last_update = 0
         self.current_frame = 0
-
+        self.health = HEALTH
+        self.healthbar = HealthBar(self)
         self.spritesheet = Spritesheet(path.join(self.game.img_dir, "sprite_sheet.png"))
         self.load_images()
         self.camera = Camera(self, self.game)
@@ -258,6 +259,7 @@ class Player(Sprite):
         self.animate()
         self.basic_attack.update()
         self.get_collisions()
+        self.healthbar.update()
 
     def get_collisions(self):
         for attack in self.game.dino.all_attacks:
@@ -276,7 +278,9 @@ class Player(Sprite):
                 )
             ):
                 print("hit player")
-                self.kill()
+                self.health -=10
+                if self.health<= 0:
+                    self.kill()
         for attack in self.game.alien.all_attacks:
 
             if (
@@ -293,7 +297,9 @@ class Player(Sprite):
                 )
             ):
                 print("hit player")
-                self.kill()
+                self.health -=10
+                if self.health<= 0:
+                    self.kill()
 
     def load_images(self):
         # loads images for the player
