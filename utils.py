@@ -56,7 +56,9 @@ class Cooldown:
         self.start_time = 0
         self.time = time
 
-    def start(self):
+    def start(self,time = None):
+        if time == None:
+            time = self.time
         self.start_time = pg.time.get_ticks()
 
     def ready(self):
@@ -67,6 +69,8 @@ class Cooldown:
         if current_time - self.start_time >= self.time:
             return True
         return False
+    def reset(self):
+        self.start_time = 0
 
 
 class HealthBar(Sprite):
@@ -80,17 +84,17 @@ class HealthBar(Sprite):
         index = self.player.health
         percent = self.player.health / HEALTH
 
-        index = int(index /2)
+        index = int(index / 2)
         bar_surf = pg.Surface((index, 10))
         # 2. Fill it with color
-        bar_surf.fill((int(255 * (1 - percent)), int(255 * (percent)),50 ))
-        
+        bar_surf.fill((int(255 * (1 - percent)), int(255 * (percent)), 50))
+
         # 3. Create the main image surface (the full 100-width bar)
         self.image = pg.Surface((100, 20))
         # 4. Fill it with a background color (optional, e.g., black)
-        # self.image.fill((0, 0, 0)) 
+        # self.image.fill((0, 0, 0))
         # 5. blit the health bar onto the main surface
-        self.image.blit(bar_surf, (25+25-index//2, 5))
+        self.image.blit(bar_surf, (25 + 25 - index // 2, 5))
         self.image.set_colorkey(BLACK)
         self.rect = self.image.get_rect()
         self.rect.center = (self.player.pos.x, self.player.pos.y)

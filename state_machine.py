@@ -1,4 +1,9 @@
 is_log_enabled: bool = False
+import pygame as pg
+from utils import *
+from settings import *
+
+
 
 
 class State:
@@ -7,10 +12,10 @@ class State:
         self.player = player
 
     def enter(self):
-        pass
+        self.active = True
 
     def exit(self):
-        pass
+        self.active = False
 
     def update(self):
         pass
@@ -27,11 +32,7 @@ class Running(State):
     def __init__(self, active, player):
         State.__init__(self, active, player)
 
-    def enter(self):
-        pass
-
-    def exit(self):
-        pass
+ 
 
     def update(self):
         print("running")
@@ -52,11 +53,7 @@ class Idle(State):
     def __init__(self, active, player):
         State.__init__(self, active, player)
 
-    def enter(self):
-        pass
-
-    def exit(self):
-        pass
+    
 
     def update(self):
         pass
@@ -69,11 +66,8 @@ class Airborne(State):
     def __init__(self, active, player):
         State.__init__(self, active, player)
 
-    def enter(self):
-        pass
+ 
 
-    def exit(self):
-        pass
 
     def update(self):
         # print("airborne")
@@ -92,11 +86,6 @@ class Dashing(State):
     def __init__(self, active, player):
         State.__init__(self, active, player)
 
-    def enter(self):
-        pass
-
-    def exit(self):
-        pass
 
     def update(self):
         # print("airborne")
@@ -109,17 +98,14 @@ class Dashing(State):
         if self.player.dash.active == True:
 
             self.active = True
+        else:
+            self.active = False
 
 
 class Attacking(State):
     def __init__(self, active, player):
         State.__init__(self, active, player)
 
-    def enter(self):
-        pass
-
-    def exit(self):
-        pass
 
     def update(self):
         # print("airborne")
@@ -132,6 +118,57 @@ class Attacking(State):
         if self.player.basic_attack.active == True:
 
             self.active = True
+        else:
+            self.active = False
+        
+
+
+class Stunned(State):
+    def __init__(self, active, player):
+        State.__init__(self, active, player)
+        self.lifetime = Cooldown(500)
+
+    def enter(self,time):
+        
+        self.lifetime.start(time)
+        self.active = True
+
+    def exit(self):
+        self.lifetime.reset()
+        self.active = False
+
+    def update(self):
+        # print("airborne")
+        pass
+
+    def get_name(self):
+        return "stunned"
+
+    def check(self):
+        if self.lifetime.ready() == True:
+            self.exit()
+
+
+class Invincible(State):
+    def __init__(self, active, player):
+        State.__init__(self, active, player)
+
+   
+    def update(self):
+        # print("airborne")
+        pass
+
+    def get_name(self):
+        return "invincible"
+
+    def check(self):
+        if self.player.state_machine.states["stunned"].active == True:
+
+            self.enter()
+        if self.player.state_machine.states["dashing"].active == True:
+            self.enter()
+        else:
+            self.exit()
 
 
 class StateMachine:
@@ -155,7 +192,10 @@ class StateMachine:
 
         for statename, state in self.states.items():
             if statename in self.requestedStates:
-                self.states[statename].active = self.requestedStates[statename]
+                if self.requestedStates[statename] ==True:
+                    self.states[statename].enter()
+                else:
+                    self.states[statename].exit()
 
             state.check()
             if state.active:
@@ -166,3 +206,14 @@ class StateMachine:
 
         if statename in self.states:
             self.requestedStates[statename] = bool
+
+def Dino_STATES(player):
+    return [
+        Running(False, player),
+        Idle(True, player),
+        Airborne(False, player),
+        Dashing(False, player),
+        Attacking(False, player),
+        Stunned(False, player),
+        Invincible(False, player),
+    ]

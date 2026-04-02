@@ -42,6 +42,7 @@ class Game:
         self.all_walls = pg.sprite.Group()
         self.all_coins = pg.sprite.Group()
         self.all_mobs = pg.sprite.Group()
+        self.all_attacks = pg.sprite.Group()
         # self.all_mobs.add(Mob(self, 10, 10))
 
         self.load_map()

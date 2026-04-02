@@ -1,5 +1,5 @@
 import pygame as pg
-from state_machine import *
+
 
 TILESIZE = 32
 TILES_W = 40
@@ -19,20 +19,12 @@ FPS = 60
 SCORE = 0
 
 
-def Dino_STATES(player):
-    return [
-        Running(False, player),
-        Idle(True, player),
-        Airborne(False, player),
-        Dashing(False, player),
-        Attacking(False, player),
-    ]
 
 
 TITLE = "hello"
 HEALTH = 100
 MOB_ACCELERATION = 1.2
-FRICTION = 4.0
+FRICTION = 0.7
 ACCELERATION = 4.5
 GRAVITY = 0.45
 JUMP_SPEED = 13
@@ -41,4 +33,5 @@ DASH_COOLDOWN = 450
 DASH_TIME = 60
 ATTACK_COOLDOWN = 560
 ATTACK_TIME = 120
+STUN_TIME = 500
 # PLAYER_HIT_SIZE = pg.Rect(0, 0, TILESIZE, TILESIZE)

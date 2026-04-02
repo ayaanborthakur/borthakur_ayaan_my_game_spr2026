@@ -225,6 +225,13 @@ class Player(Sprite):
         self.all_attacks.append(self.basic_attack)
         self.dash = self.Dash(self)
         self.animate()
+        self.keys = {
+            "left": None,
+            "right": None,
+            "jump": None,
+            "attack": None,
+            "dash": None,
+        }
 
     def update(self):
         # get keys and check if character is even moving
@@ -249,7 +256,7 @@ class Player(Sprite):
 
         if not is_moving:
 
-            self.vel.x *= 0.75
+            self.vel.x *= FRICTION
             if abs(self.vel.x) <= 0.05:
 
                 self.vel.x = 0
@@ -262,7 +269,7 @@ class Player(Sprite):
         self.healthbar.update()
 
     def get_collisions(self):
-        for attack in self.game.dino.all_attacks:
+        for attack in self.game.all_attacks:
 
             if (
                 attack.player != self
@@ -277,29 +284,16 @@ class Player(Sprite):
                     )
                 )
             ):
-                print("hit player")
-                self.health -=10
-                if self.health<= 0:
-                    self.kill()
-        for attack in self.game.alien.all_attacks:
+                print("got hit")
+                self.damage(attack)
 
-            if (
-                attack.player != self
-                and attack.active
-                and (
-                    self.hitbox.overlap(
-                        attack.hitbox,
-                        (
-                            int(attack.rect.left - self.rect.left),
-                            int(attack.rect.top - self.rect.top),
-                        ),
-                    )
-                )
-            ):
-                print("hit player")
-                self.health -=10
-                if self.health<= 0:
-                    self.kill()
+    def damage(self, attack):
+        if not self.state_machine.states["invincible"].active:
+            self.health -= attack.damage
+            if self.health <= 0:
+                self.kill()
+            attack.affect(self)
+            self.state_machine.stateManage("invincible", True)
 
     def load_images(self):
         # loads images for the player
@@ -337,42 +331,46 @@ class Player(Sprite):
         keys = pg.key.get_pressed()
 
         value = False
-        if keys[pg.K_w] and not self.state_machine.states["airborne"].active:
-            print("jumped")
-            self.state_machine.stateManage("airborne", True)
+        if not self.state_machine.states["stunned"].active:
+            if (
+                keys[self.keys["jump"]]
+                and not self.state_machine.states["airborne"].active
+            ):
+                print("jumped")
+                self.state_machine.stateManage("airborne", True)
 
-            self.vel.y = -JUMP_SPEED
-        if keys[pg.K_s]:
-            print("dashed")
-            self.dash.activate()
-        if keys[pg.K_q]:
-            print("attacked")
-            self.basic_attack.activate()
-        if abs(self.vel.x) < PLAYER_SPEED:
-            if abs(self.vel.x) + ACCELERATION >= PLAYER_SPEED:
-                if keys[pg.K_a]:
-                    self.vel.x = -PLAYER_SPEED
-                    value = True
-                if keys[pg.K_d]:
-                    self.vel.x = PLAYER_SPEED
-                    value = True
-            else:
-                if keys[pg.K_a]:
-                    self.vel.x -= ACCELERATION
+                self.vel.y = -JUMP_SPEED
+            if keys[self.keys["dash"]]:
+                print("dashed")
+                self.dash.activate()
+            if keys[self.keys["attack"]]:
+                print("attacked")
+                self.basic_attack.activate()
+            if abs(self.vel.x) < PLAYER_SPEED:
+                if abs(self.vel.x) + ACCELERATION >= PLAYER_SPEED:
+                    if keys[self.keys["left"]]:
+                        self.vel.x = -PLAYER_SPEED
+                        value = True
+                    if keys[self.keys["right"]]:
+                        self.vel.x = PLAYER_SPEED
+                        value = True
+                else:
+                    if keys[self.keys["left"]]:
+                        self.vel.x -= ACCELERATION
 
-                    value = True
-                if keys[pg.K_d]:
-                    self.vel.x += ACCELERATION
-                    value = True
+                        value = True
+                    if keys[self.keys["right"]]:
+                        self.vel.x += ACCELERATION
+                        value = True
         return value
 
     class BasicAttack(Sprite):
         def __init__(self, player):
             self.player = player
             Sprite.__init__(self, self.player.game.all_sprites)
-
+            self.player.game.all_attacks.add(self)
             self.pos = self.player.pos
-
+            self.damage = 10
             self.image = pg.Surface((0, 0))
 
             self.spritesheet = Spritesheet(
@@ -410,6 +408,12 @@ class Player(Sprite):
                 self.activetimer.start()
                 self.activecooldown.start()
                 self.active = True
+
+        def affect(self, player):
+            # this is where you can add knockback and stuff
+            player.vel.x += 100
+            player.vel.y -= 50
+            player.state_machine.states["stunned"].enter(STUN_TIME)
 
     class Dash(Sprite):
         def __init__(self, player):
@@ -463,46 +467,26 @@ class Dino(Player):
 
     def __init__(self, game, x, y):
         Player.__init__(self, game, x, y)
+        self.keys = {
+            "left": pg.K_a,
+            "right": pg.K_d,
+            "jump": pg.K_w,
+            "attack": pg.K_LSHIFT,
+            "dash": pg.K_s,
+        }
 
 
 class Alien(Player):
 
     def __init__(self, game, x, y):
         Player.__init__(self, game, x, y)
-
-    def get_keys(self):
-        # gets keys and stuff
-        keys = pg.key.get_pressed()
-
-        value = False
-        if keys[pg.K_UP] and not self.state_machine.states["airborne"].active:
-            print("jumped")
-            self.state_machine.stateManage("airborne", True)
-
-            self.vel.y = -JUMP_SPEED
-        if keys[pg.K_DOWN]:
-            print("dashed")
-            self.dash.activate()
-        if keys[pg.K_RSHIFT]:
-            print("attacked")
-            self.basic_attack.activate()
-        if abs(self.vel.x) < PLAYER_SPEED:
-            if abs(self.vel.x) + ACCELERATION >= PLAYER_SPEED:
-                if keys[pg.K_LEFT]:
-                    self.vel.x = -PLAYER_SPEED
-                    value = True
-                if keys[pg.K_RIGHT]:
-                    self.vel.x = PLAYER_SPEED
-                    value = True
-            else:
-                if keys[pg.K_LEFT]:
-                    self.vel.x -= ACCELERATION
-
-                    value = True
-                if keys[pg.K_RIGHT]:
-                    self.vel.x += ACCELERATION
-                    value = True
-        return value
+        self.keys = {
+            "left": pg.K_LEFT,
+            "right": pg.K_RIGHT,
+            "jump": pg.K_UP,
+            "attack": pg.K_RSHIFT,
+            "dash": pg.K_DOWN,
+        }
 
 
 class Mob(Sprite):
