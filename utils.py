@@ -74,15 +74,15 @@ class Cooldown:
 
 
 class HealthBar(Sprite):
-    def __init__(self, player):
-        self.player = player
-        Sprite.__init__(self, self.player.game.all_sprites)
+    def __init__(self, sprite):
+        self.sprite = sprite
+        Sprite.__init__(self, self.sprite.game.all_sprites)
 
         self.update()
 
     def update(self):
-        index = self.player.health
-        percent = self.player.health / HEALTH
+        index = self.sprite.health
+        percent = self.sprite.health / HEALTH
 
         index = int(index / 2)
         bar_surf = pg.Surface((index, 10))
@@ -97,8 +97,8 @@ class HealthBar(Sprite):
         self.image.blit(bar_surf, (25 + 25 - index // 2, 5))
         self.image.set_colorkey(BLACK)
         self.rect = self.image.get_rect()
-        self.rect.center = (self.player.pos.x, self.player.pos.y)
-        self.rect.top = self.player.rect.bottom
+        self.rect.center = (self.sprite.pos.x, self.sprite.pos.y)
+        self.rect.top = self.sprite.rect.bottom
 
 
 # loads an image file and creates an image surface for blitting or drawing images on the surface

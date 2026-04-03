@@ -42,6 +42,7 @@ class Game:
         self.all_walls = pg.sprite.Group()
         self.all_coins = pg.sprite.Group()
         self.all_mobs = pg.sprite.Group()
+        self.all_players = pg.sprite.Group()
         self.all_attacks = pg.sprite.Group()
         # self.all_mobs.add(Mob(self, 10, 10))
 
@@ -107,10 +108,12 @@ class Game:
                 if obj["type"] == "Player":
                     if obj["name"] == "player1":
                         self.dino = Dino(self, grid_x, grid_y)
+                        self.all_players.add(self.dino)
                     elif obj["name"] == "player2":
                         self.alien = Alien(self, grid_x, grid_y)
+                        self.all_players.add(self.alien)
                 elif obj["type"] == "Mob":
-                    self.all_mobs.add(Mob(self, grid_x, grid_y))
+                    self.all_mobs.add(Mob(self, grid_x, grid_y,self.dino))
 
         if not hasattr(self, "dino"):
             self.dino = Dino(self, 10, 10)

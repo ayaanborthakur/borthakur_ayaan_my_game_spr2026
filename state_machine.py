@@ -7,9 +7,9 @@ from settings import *
 
 
 class State:
-    def __init__(self, active, player):
+    def __init__(self, active, sprite):
         self.active = active
-        self.player = player
+        self.sprite = sprite
 
     def enter(self):
         self.active = True
@@ -29,8 +29,8 @@ class State:
 
 class Running(State):
 
-    def __init__(self, active, player):
-        State.__init__(self, active, player)
+    def __init__(self, active, sprite):
+        State.__init__(self, active, sprite)
 
  
 
@@ -42,7 +42,7 @@ class Running(State):
 
     def check(self):
         # We use absolute value to check if moving left or right
-        if abs(self.player.vel.x) > 0.05:
+        if abs(self.sprite.vel.x) > 0.05:
             self.active = True
         else:
             self.active = False
@@ -50,8 +50,8 @@ class Running(State):
 
 class Idle(State):
 
-    def __init__(self, active, player):
-        State.__init__(self, active, player)
+    def __init__(self, active, sprite):
+        State.__init__(self, active, sprite)
 
     
 
@@ -63,28 +63,28 @@ class Idle(State):
 
 
 class Airborne(State):
-    def __init__(self, active, player):
-        State.__init__(self, active, player)
+    def __init__(self, active, sprite):
+        State.__init__(self, active, sprite)
 
  
 
 
     def update(self):
-        # print("airborne")
+        print("airborne", self.sprite)
         pass
 
     def get_name(self):
         return "airborne"
 
     def check(self):
-        if self.player.vel.y != 0:
+        if self.sprite.vel.y != 0:
 
             self.active = True
 
 
 class Dashing(State):
-    def __init__(self, active, player):
-        State.__init__(self, active, player)
+    def __init__(self, active, sprite):
+        State.__init__(self, active, sprite)
 
 
     def update(self):
@@ -95,16 +95,16 @@ class Dashing(State):
         return "dashing"
 
     def check(self):
-        if self.player.dash.active == True:
+        if self.sprite.dash.active == True:
 
             self.active = True
         else:
             self.active = False
 
 
-class Attacking(State):
-    def __init__(self, active, player):
-        State.__init__(self, active, player)
+class Player_Attacking(State):
+    def __init__(self, active, sprite):
+        State.__init__(self, active, sprite)
 
 
     def update(self):
@@ -112,10 +112,10 @@ class Attacking(State):
         pass
 
     def get_name(self):
-        return "attacking"
+        return "player_attacking"
 
     def check(self):
-        if self.player.basic_attack.active == True:
+        if self.sprite.basic_attack.active == True:
 
             self.active = True
         else:
@@ -123,9 +123,24 @@ class Attacking(State):
         
 
 
+class Mob_Attacking(State):
+    def __init__(self, active, sprite):
+        State.__init__(self, active, sprite)
+
+
+    def update(self):
+        # print("airborne")
+        pass
+
+    def get_name(self):
+        return "mob_attacking"
+
+    def check(self):
+        pass
+
 class Stunned(State):
-    def __init__(self, active, player):
-        State.__init__(self, active, player)
+    def __init__(self, active, sprite):
+        State.__init__(self, active, sprite)
         self.lifetime = Cooldown(500)
 
     def enter(self,time):
@@ -150,8 +165,8 @@ class Stunned(State):
 
 
 class Invincible(State):
-    def __init__(self, active, player):
-        State.__init__(self, active, player)
+    def __init__(self, active, sprite):
+        State.__init__(self, active, sprite)
 
    
     def update(self):
@@ -162,10 +177,16 @@ class Invincible(State):
         return "invincible"
 
     def check(self):
-        if self.player.state_machine.states["stunned"].active == True:
+        value = False
+        if self.sprite.state_machine.states["stunned"].active == True:
 
-            self.enter()
-        if self.player.state_machine.states["dashing"].active == True:
+            value = True
+        
+        if "dashing" in self.sprite.state_machine.states:
+            if self.sprite.state_machine.states["dashing"].active == True:
+                value = True 
+        
+        if value == True:
             self.enter()
         else:
             self.exit()
@@ -207,13 +228,23 @@ class StateMachine:
         if statename in self.states:
             self.requestedStates[statename] = bool
 
-def Dino_STATES(player):
+def Player_STATES(sprite):
     return [
-        Running(False, player),
-        Idle(True, player),
-        Airborne(False, player),
-        Dashing(False, player),
-        Attacking(False, player),
-        Stunned(False, player),
-        Invincible(False, player),
+        Running(False, sprite),
+        Idle(True, sprite),
+        Airborne(False, sprite),
+        Dashing(False, sprite),
+        Player_Attacking(False, sprite),
+        Stunned(False, sprite),
+        Invincible(False, sprite),
     ]
+
+def Mob_STATES(mob):
+    return [
+        Running(False, mob),
+        Idle(True, mob),
+        Airborne(False, mob),
+        Mob_Attacking(False, mob),
+        Stunned(False, mob),
+        Invincible(False, mob),
+    ]   
