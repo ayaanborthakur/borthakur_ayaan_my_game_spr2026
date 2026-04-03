@@ -149,6 +149,10 @@ class Game:
     def update(self):
 
         self.all_sprites.update()
+        if hasattr(self, "dino"):
+            self.dino.healthbar.update()
+        if hasattr(self, "alien"):
+            self.alien.healthbar.update()
 
     # not used anymore
     def draw_text(self, surface, text, size, color, x, y):
@@ -172,6 +176,11 @@ class Game:
             self.left_side.blit(sprite.image, self.dino.camera.apply(sprite))
             self.right_side.blit(sprite.image, self.alien.camera.apply(sprite))
 
+        # Draw borders ONCE and correctly sized after all sprites are blitted
+        pg.draw.rect(self.left_side, BLACK, (0, 0, (WIDTH / 2)+5, HEIGHT), width=10)
+        pg.draw.rect(self.right_side, BLACK, (-5, 0, (WIDTH / 2)+5, HEIGHT), width=10)
+        self.left_side.blit(self.dino.healthbar.image, (self.dino.healthbar.pos.x,self.dino.healthbar.pos.y))
+        self.right_side.blit(self.alien.healthbar.image, (self.alien.healthbar.pos.x,self.alien.healthbar.pos.y))
         self.screen.blit(self.left_side, (0, 0))
         self.screen.blit(self.right_side, (WIDTH / 2, 0))
         pg.display.flip()

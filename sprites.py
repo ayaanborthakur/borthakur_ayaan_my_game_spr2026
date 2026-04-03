@@ -213,7 +213,7 @@ class Player(Sprite):
         self.last_update = 0
         self.current_frame = 0
         self.health = HEALTH
-        self.healthbar = HealthBar(self)
+        self.healthbar = PlayerHealthBar(self)
         self.spritesheet = Spritesheet(path.join(self.game.img_dir, "sprite_sheet.png"))
         self.load_images()
         self.camera = Camera(self, self.game)
@@ -221,9 +221,9 @@ class Player(Sprite):
         self.state_machine.start_machine(Player_STATES(self))
         self.hitbox = pg.mask.from_surface(self.image)
         self.all_attacks = []
-        self.basic_attack = self.BasicAttack(self)
+        self.basic_attack = BasicAttack(self)
         self.all_attacks.append(self.basic_attack)
-        self.dash = self.Dash(self)
+        self.dash = Dash(self)
         self.animate()
         self.keys = {
             "left": None,
@@ -266,7 +266,6 @@ class Player(Sprite):
         self.animate()
         self.basic_attack.update()
         self.get_collisions()
-        self.healthbar.update()
 
     def get_collisions(self):
         for attack in self.game.all_attacks:
@@ -289,11 +288,9 @@ class Player(Sprite):
 
     def damage(self, attack):
         if not self.state_machine.states["invincible"].active:
-            self.health -= attack.damage
+            attack.affect(self)
             if self.health <= 0:
                 self.die()
-            attack.affect(self)
-            self.state_machine.stateManage("invincible", True)
 
     def load_images(self):
         # loads images for the sprite
@@ -345,7 +342,7 @@ class Player(Sprite):
                 self.dash.activate()
             if keys[self.keys["attack"]]:
                 print("attacked")
-                self.basic_attack.activate()
+                self.basic_attack.activate(self.state_machine.states["running"].direction)
             if abs(self.vel.x) < PLAYER_SPEED:
                 if abs(self.vel.x) + ACCELERATION >= PLAYER_SPEED:
                     if keys[self.keys["left"]]:
@@ -370,103 +367,7 @@ class Player(Sprite):
                     if sprite.sprite == self:
                         sprite.kill()
             self.kill()
-    class BasicAttack(Sprite):
-        def __init__(self, sprite):
-            self.sprite = sprite
-            Sprite.__init__(self, self.sprite.game.all_sprites)
-            self.sprite.game.all_attacks.add(self)
-            self.pos = self.sprite.pos
-            self.damage = 10
-            self.image = pg.Surface((0, 0))
-
-            self.spritesheet = Spritesheet(
-                path.join(self.sprite.game.img_dir, "attack.png")
-            )
-
-            self.hitbox = pg.mask.from_surface(self.image)
-
-            self.activetimer = Cooldown(ATTACK_TIME)
-            self.activecooldown = Cooldown(ATTACK_COOLDOWN)
-            self.activecooldown.start()
-            self.active = False
-
-        def update(self):
-
-            self.active = not self.activetimer.ready()
-            if self.active:
-                self.image = self.spritesheet.get_image(0, 0, 64, 64)
-
-            else:
-                self.image = pg.Surface((0, 0))
-
-            self.image.set_colorkey(BLACK)
-            self.rect = self.image.get_rect()
-
-            self.hitbox = pg.mask.from_surface(self.image)
-
-            self.pos = self.sprite.pos
-            self.rect.center = self.pos
-
-        def activate(self):
-            if self.activecooldown.ready():
-                print("active big dawg")
-
-                self.activetimer.start()
-                self.activecooldown.start()
-                self.active = True
-
-        def affect(self, sprite):
-            # this is where you can add knockback and stuff
-            sprite.vel.x += 20
-            sprite.vel.y -= 10
-            sprite.state_machine.states["stunned"].enter(STUN_TIME)
-
-    class Dash(Sprite):
-        def __init__(self, sprite):
-            self.sprite = sprite
-
-            self.pos = self.sprite.pos
-
-            """  self.image = pg.Surface((0, 0))
-
-            self.spritesheet = Spritesheet(
-                path.join(self.sprite.game.img_dir, "attack.png")
-            ) """
-
-            """ self.hitbox = pg.mask.from_surface(self.image) """
-
-            self.activetimer = Cooldown(DASH_TIME)
-            self.activecooldown = Cooldown(DASH_COOLDOWN)
-            self.activecooldown.start()
-            self.active = False
-        
-        def update(self):
-
-            self.active = not self.activetimer.ready()
-            if self.active and self.sprite.vel.x != 0:
-                print("dashing big dawg")
-
-                self.sprite.vel.x += (
-                    self.sprite.vel.x / abs(self.sprite.vel.x) * DASH_SPEED
-                )
-
-            """ else:
-                self.image = pg.Surface((0, 0)) """
-
-            """ self.image.set_colorkey(BLACK)
-            self.rect = self.image.get_rect()
-
-            self.hitbox = pg.mask.from_surface(self.image) """
-
-            """ self.pos = self.sprite.pos
-            self.rect.center = self.pos """
-
-        def activate(self):
-            if self.activecooldown.ready():
-
-                self.activetimer.start()
-                self.activecooldown.start()
-                self.active = True
+    
 
 
 class Dino(Player):
@@ -480,6 +381,9 @@ class Dino(Player):
             "attack": pg.K_LSHIFT,
             "dash": pg.K_s,
         }
+        if hasattr(self.game, "left_side"):
+            self.side = self.game.left_side
+        
 
 
 class Alien(Player):
@@ -487,12 +391,14 @@ class Alien(Player):
     def __init__(self, game, x, y):
         Player.__init__(self, game, x, y)
         self.keys = {
-            "left": pg.K_LEFT,
-            "right": pg.K_RIGHT,
-            "jump": pg.K_UP,
+            "left": pg.K_l,
+            "right": pg.K_QUOTE,
+            "jump": pg.K_p,
             "attack": pg.K_RSHIFT,
-            "dash": pg.K_DOWN,
+            "dash": pg.K_SEMICOLON,
         }
+        if hasattr(self.game, "right_side"):
+            self.side = self.game.right_side
 
 
 class Mob(Sprite):
@@ -502,7 +408,7 @@ class Mob(Sprite):
         Sprite.__init__(self, self.groups)
         self.game = game
         self.image = pg.Surface((TILESIZE, TILESIZE))
-        self.image.fill(GREEN)
+        self.image.fill(BLUE)
         self.hitbox = pg.mask.from_surface(self.image)
         self.rect = self.image.get_rect()
         self.accel = vec(0, 0)
@@ -517,17 +423,16 @@ class Mob(Sprite):
 
     def damage(self, attack):
         if not self.state_machine.states["invincible"].active:
-            self.health -= attack.damage
+            attack.affect(self)
             if self.health <= 0:
                 self.die()
-            attack.affect(self)
-            self.state_machine.stateManage("invincible", True)
     def die(self):
         
         for sprite in self.game.all_sprites:
             if hasattr(sprite, "sprite"):
                 if sprite.sprite == self:
                     sprite.kill()
+        self.healthbar.kill()
         self.kill()
     def update(self):
         # calls movement toward sprite
