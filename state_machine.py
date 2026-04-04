@@ -274,7 +274,7 @@ def Mob_STATES(mob):
         Invincible(False, mob),
     ]   
 #abilities
-class Ability(Sprite):
+class MeleeAbility(Sprite):
         def __init__(self, sprite,image,cooldown,duration,damage,knockback,stun_time,invincible_time,affects=[]):
             self.sprite = sprite
             Sprite.__init__(self, self.sprite.game.all_sprites)
@@ -295,8 +295,7 @@ class Ability(Sprite):
             self.hitbox = pg.mask.from_surface(self.image)
             self.direction = 1
             self.activetimer = Cooldown(duration)
-            self.activecooldown = Cooldown(cooldown)
-            self.activecooldown.start()
+            self.cooldown = Cooldown(cooldown)
             self.active = False
 
         def update(self):
@@ -322,10 +321,10 @@ class Ability(Sprite):
 
         def activate(self,direction):
             self.direction = direction
-            if self.activecooldown.ready():
+            if self.cooldown.ready():
 
                 self.activetimer.start()
-                self.activecooldown.start()
+                self.cooldown.start()
                 self.active = True
 
         def affect(self, sprite):
@@ -339,11 +338,100 @@ class Ability(Sprite):
                 for affect in self.affects:
                     sprite.state_machine.affects.append(affect(sprite))
 
-
-class BasicAttack(Ability):
-        def __init__(self, sprite):
+class RangedAbility(Sprite):
+        def __init__(self, sprite,cooldown,projectile,image = None):
+            self.sprite = sprite
+            Sprite.__init__(self, self.sprite.game.all_sprites)
+            self.pos = self.sprite.pos
+            self.projectiles = []
+            self.projectile = projectile
+            self.image = pg.Surface((1,1))
+            self.image.set_colorkey(BLACK)
+            self.rect = self.image.get_rect()
+            self.hitbox = pg.mask.from_surface(self.image)
             
-            Ability.__init__(self, sprite, "attack.png", ATTACK_COOLDOWN, ATTACK_TIME, 10, [10, -20], STUN_TIME, STUN_TIME, [])
+            
+            self.direction = 1
+            self.cooldown = Cooldown(cooldown)
+            
+
+        def update(self):
+
+            
+            for projectile in self.projectiles:
+                projectile.update()
+                if projectile.active == False:
+                    self.projectiles.remove(projectile)
+                    projectile.kill()
+
+
+
+            #self.pos = self.sprite.pos
+            #self.rect.center = self.pos
+
+        def activate(self,direction):
+            self.direction = direction
+            if self.cooldown.ready():
+                self.projectiles.append(self.projectile(self.sprite, self.direction))
+                self.cooldown.start()
+                
+
+class Projectile(Sprite):
+    def __init__(self, sprite, direction, image, speed, damage, knockback, stun_time, invincible_time, affects=[]):
+        self.sprite = sprite
+        Sprite.__init__(self, self.sprite.game.all_sprites)
+        self.sprite.game.all_attacks.add(self)
+        self.pos = pg.math.Vector2(self.sprite.pos)
+        self.direction = direction
+        self.speed = speed
+        self.active = True
+        self.image = pg.Surface((10, 10))
+        pg.draw.circle(self.image, (255, 0, 0), (5, 5), 5)
+        self.image.set_colorkey(BLACK)
+        self.rect = self.image.get_rect()
+        self.hitbox = pg.mask.from_surface(self.image)
+        self.rect.center = self.pos
+        self.damage = damage
+        self.knockback = knockback
+        self.stun_time = stun_time
+        self.invincible_time = invincible_time
+        self.affects = affects
+    def update(self):
+        self.pos.x += self.speed * self.direction
+        self.rect.center = self.pos
+        
+        if self.active == False:
+            self.die()
+    def affect(self, sprite):
+            # this is where you can add knockback and stuff
+            sprite.vel.x += self.knockback[0]
+            sprite.vel.y += self.knockback[1]
+            sprite.health -= self.damage
+            sprite.state_machine.states["stunned"].enter(self.stun_time)
+            sprite.state_machine.states["invincible"].enter(self.invincible_time)
+            if self.affects != []:
+                for affect in self.affects:
+                    
+                    sprite.state_machine.affects.append(affect(sprite))
+            self.die()
+            self.active = False
+    def die(self):
+
+        self.kill()
+
+class BasicRangedAbility(RangedAbility):
+    def __init__(self, sprite):
+        RangedAbility.__init__(self, sprite, 500, BasicProjectile)
+
+
+class BasicProjectile(Projectile):
+    def __init__(self, sprite, direction):
+        Projectile.__init__(self, sprite, direction, None, 5, 5, [5, -5], 10, 10, [])
+
+class BasicAttack(MeleeAbility):
+    def __init__(self, sprite):
+            
+        MeleeAbility.__init__(self, sprite, "attack.png", ATTACK_COOLDOWN, ATTACK_TIME, 10, [10, -20], STUN_TIME, STUN_TIME, [])
 
         
 
@@ -362,8 +450,8 @@ class Dash(Sprite):
             """ self.hitbox = pg.mask.from_surface(self.image) """
 
             self.activetimer = Cooldown(DASH_TIME)
-            self.activecooldown = Cooldown(DASH_COOLDOWN)
-            self.activecooldown.start()
+            self.cooldown = Cooldown(DASH_COOLDOWN)
+            self.cooldown.start()
             self.active = False
         
         def update(self):
@@ -388,8 +476,8 @@ class Dash(Sprite):
             self.rect.center = self.pos """
 
         def activate(self):
-            if self.activecooldown.ready():
+            if self.cooldown.ready():
 
                 self.activetimer.start()
-                self.activecooldown.start()
+                self.cooldown.start()
                 self.active = True

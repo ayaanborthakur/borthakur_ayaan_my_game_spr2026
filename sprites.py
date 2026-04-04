@@ -224,6 +224,8 @@ class Player(Sprite):
         self.basic_attack = BasicAttack(self)
         self.all_attacks.append(self.basic_attack)
         self.dash = Dash(self)
+        self.basic_ranged_ability = BasicRangedAbility(self)
+        self.all_attacks.append(self.basic_ranged_ability)
         self.animate()
         self.keys = {
             "left": None,
@@ -340,7 +342,10 @@ class Player(Sprite):
             if keys[self.keys["dash"]]:
                 print("dashed")
                 self.dash.activate()
-            if keys[self.keys["attack"]]:
+            if keys[self.keys["ranged"]]:
+                print("basic ranged ability")
+                self.basic_ranged_ability.activate(self.state_machine.states["running"].direction)
+            if keys[self.keys["melee"]]:
                 print("attacked")
                 self.basic_attack.activate(self.state_machine.states["running"].direction)
             if abs(self.vel.x) < PLAYER_SPEED:
@@ -378,8 +383,9 @@ class Dino(Player):
             "left": pg.K_a,
             "right": pg.K_d,
             "jump": pg.K_w,
-            "attack": pg.K_LSHIFT,
+            "melee": pg.K_LSHIFT,
             "dash": pg.K_s,
+            "ranged": pg.K_LALT,
         }
         if hasattr(self.game, "left_side"):
             self.side = self.game.left_side
@@ -394,8 +400,9 @@ class Alien(Player):
             "left": pg.K_l,
             "right": pg.K_QUOTE,
             "jump": pg.K_p,
-            "attack": pg.K_RSHIFT,
+            "melee": pg.K_RSHIFT,
             "dash": pg.K_SEMICOLON,
+            "ranged": pg.K_RALT,
         }
         if hasattr(self.game, "right_side"):
             self.side = self.game.right_side

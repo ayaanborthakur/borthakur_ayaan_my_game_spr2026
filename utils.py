@@ -32,7 +32,17 @@ class Camera:
         self.center = vec(WIDTH / 4, HEIGHT / 2)
 
     def update(self):
-        self.offset = self.player.pos - self.center
+        # rigidly follow on X axis
+        self.offset.x = self.player.pos.x - self.center.x
+
+        # apply a Deadzone on the Y axis so the camera doesn't pan vertically for small jumps!
+        current_y_focus = self.offset.y + self.center.y
+        dist_y = self.player.pos.y - current_y_focus
+        
+        if dist_y > 100:
+            self.offset.y += (dist_y - 100)
+        elif dist_y < -100:
+            self.offset.y += (dist_y + 100)
 
     def apply(self, sprite):
         return sprite.rect.move(-self.offset.x, -self.offset.y)
