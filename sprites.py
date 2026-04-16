@@ -217,7 +217,7 @@ class Player(Sprite):
         self.spritesheet = Spritesheet(path.join(self.game.img_dir, "sprite_sheet.png"))
         self.load_images()
         self.camera = Camera(self, self.game)
-        self.state_machine = StateMachine()
+        self.state_machine = StateMachine(self)
         self.state_machine.start_machine(Player_STATES(self))
         self.hitbox = pg.mask.from_surface(self.image)
         self.all_attacks = []
@@ -234,6 +234,10 @@ class Player(Sprite):
             "attack": None,
             "dash": None,
         }
+        self.jump_speed = JUMP_SPEED
+        self.dash_speed = DASH_SPEED
+        self.speed = PLAYER_SPEED
+        
 
     def update(self):
         # get keys and check if character is even moving
@@ -250,13 +254,21 @@ class Player(Sprite):
             pass
 
         self.vel.y += GRAVITY
+        
+        slow_mod = self.state_machine.modifiers.get("slow", 1.0)
+        
+        if slow_mod != 1.0:
+            self.vel *= slow_mod
 
         # checking if its hitting anything else
         # swept_aabb_collide moves sprite.pos internally, do NOT add vel again
         swept_aabb_collide(self, self.game.all_walls)
         self.rect.center = self.pos
 
-        if not is_moving:
+        if slow_mod != 1.0 and slow_mod != 0.0:
+            self.vel /= slow_mod
+
+        if not is_moving or abs(self.vel.x) > self.speed:
 
             self.vel.x *= FRICTION
             if abs(self.vel.x) <= 0.05:
@@ -330,6 +342,9 @@ class Player(Sprite):
         keys = pg.key.get_pressed()
 
         value = False
+
+        print(self.speed)
+
         if not self.state_machine.states["stunned"].active:
             if (
                 keys[self.keys["jump"]]
@@ -337,8 +352,7 @@ class Player(Sprite):
             ):
                 print("jumped")
                 self.state_machine.stateManage("airborne", True)
-
-                self.vel.y = -JUMP_SPEED
+                self.vel.y = -self.jump_speed
             if keys[self.keys["dash"]]:
                 print("dashed")
                 self.dash.activate()
@@ -348,22 +362,14 @@ class Player(Sprite):
             if keys[self.keys["melee"]]:
                 print("attacked")
                 self.basic_attack.activate(self.state_machine.states["running"].direction)
-            if abs(self.vel.x) < PLAYER_SPEED:
-                if abs(self.vel.x) + ACCELERATION >= PLAYER_SPEED:
-                    if keys[self.keys["left"]]:
-                        self.vel.x = -PLAYER_SPEED
-                        value = True
-                    if keys[self.keys["right"]]:
-                        self.vel.x = PLAYER_SPEED
-                        value = True
-                else:
-                    if keys[self.keys["left"]]:
-                        self.vel.x -= ACCELERATION
+            if abs(self.vel.x) < self.speed:
+                if keys[self.keys["left"]]:
+                    self.vel.x = max(self.vel.x - ACCELERATION, -self.speed)
+                    value = True
 
-                        value = True
-                    if keys[self.keys["right"]]:
-                        self.vel.x += ACCELERATION
-                        value = True
+                if keys[self.keys["right"]]:
+                    self.vel.x = min(self.vel.x + ACCELERATION, self.speed)
+                    value = True
         return value
     def die(self):
             
@@ -421,7 +427,7 @@ class Mob(Sprite):
         self.accel = vec(0, 0)
         self.vel = vec(0, 0)
         self.pos = vec(x, y)
-        self.state_machine = StateMachine()
+        self.state_machine = StateMachine(self)
         self.state_machine.start_machine(Mob_STATES(self))
         self.health = MOB_HEALTH
         self.healthbar = HealthBar(self)

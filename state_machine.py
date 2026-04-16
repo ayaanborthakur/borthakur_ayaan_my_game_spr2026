@@ -4,8 +4,6 @@ from utils import *
 from settings import *
 
 
-
-
 class State:
     def __init__(self, active, sprite):
         self.active = active
@@ -27,16 +25,17 @@ class State:
         pass
 
 
+
 class Running(State):
 
     def __init__(self, active, sprite):
         State.__init__(self, active, sprite)
         self.direction = 1
- 
 
     def update(self):
-        if self.sprite.vel.x !=0:
-            self.direction = self.sprite.vel.x/abs(self.sprite.vel.x)
+        if self.sprite.vel.x != 0:
+            self.direction = self.sprite.vel.x / abs(self.sprite.vel.x)
+
     def get_name(self):
         return "running"
 
@@ -48,12 +47,12 @@ class Running(State):
             self.active = False
 
 
+
+
 class Idle(State):
 
     def __init__(self, active, sprite):
         State.__init__(self, active, sprite)
-
-    
 
     def update(self):
         pass
@@ -65,9 +64,6 @@ class Idle(State):
 class Airborne(State):
     def __init__(self, active, sprite):
         State.__init__(self, active, sprite)
-
- 
-
 
     def update(self):
         pass
@@ -84,7 +80,6 @@ class Airborne(State):
 class Dashing(State):
     def __init__(self, active, sprite):
         State.__init__(self, active, sprite)
-
 
     def update(self):
         # print("airborne")
@@ -105,9 +100,8 @@ class Player_Attacking(State):
     def __init__(self, active, sprite):
         State.__init__(self, active, sprite)
 
-
     def update(self):
-        # print("airborne")
+        self.sprite.state_machine.stateManage("slowed", True)
         pass
 
     def get_name(self):
@@ -119,13 +113,12 @@ class Player_Attacking(State):
             self.active = True
         else:
             self.active = False
-        
+
 
 
 class Mob_Attacking(State):
     def __init__(self, active, sprite):
         State.__init__(self, active, sprite)
-
 
     def update(self):
         # print("airborne")
@@ -137,13 +130,14 @@ class Mob_Attacking(State):
     def check(self):
         pass
 
+
 class Stunned(State):
     def __init__(self, active, sprite):
         State.__init__(self, active, sprite)
         self.lifetime = Cooldown(1)
 
-    def enter(self,time=1):
-        
+    def enter(self, time=1):
+
         self.lifetime.start(time)
         self.active = True
 
@@ -163,19 +157,21 @@ class Stunned(State):
             self.exit()
 
 
+
 class Invincible(State):
     def __init__(self, active, sprite):
         State.__init__(self, active, sprite)
         self.lifetime = Cooldown(1)
-   
-    def enter(self,time = 1):
-        
+
+    def enter(self, time=1):
+
         self.lifetime.start(time)
         self.active = True
 
     def exit(self):
         self.lifetime.reset()
         self.active = False
+
     def update(self):
         # print("airborne")
         pass
@@ -187,49 +183,81 @@ class Invincible(State):
         value = False
         if self.sprite.state_machine.states["stunned"].active == True:
             value = True
-        
+
         if "dashing" in self.sprite.state_machine.states:
             if self.sprite.state_machine.states["dashing"].active == True:
-                value = True 
-        
+                value = True
+
         if value:
             self.active = True
         elif self.lifetime.ready():
             self.exit()
 
+class Slowed(State):
+    def __init__(self, active, sprite):
+        State.__init__(self, active, sprite)
+        self.lifetime = Cooldown(1)
+
+    def enter(self, time=1):
+
+        self.lifetime.start(time)
+        self.active = True
+
+    def exit(self):
+        self.active = False
+
+    def update(self):
+        self.sprite.state_machine.modifiers["slow"] = 0.6
+        
+        pass
+
+    def get_name(self):
+        return "slowed"
+
+    def check(self):
+        if self.sprite.state_machine.states["player_attacking"].active == True:
+            self.active = True
+        else:
+            self.active = False
 
 class StateMachine:
-    def __init__(self):
+    def __init__(self, sprite):
 
         self.states = {}
         print(self.states)
         self.requestedStates = {}
         self.affects = []
         self.modifiers = {
-            "jump" : 1,
-            "dash" : 1,
-            "attack" : 1,
-            
+            "jump": 1,
+            "dash": 1,
+            "attack": 1,
+            "speed":1,
+            "slow":1
         }
-        self.abilities={
-
-        }
-
+        self.abilities = {}
+        self.sprite = sprite
     def start_machine(self, init_states=[State]):
 
         for state in init_states:
             print(state.get_name())
             self.states[state.get_name()] = state
+            
             print(self.states)
 
         if is_log_enabled:
             print("starting state machine...")
 
     def update(self):
-
+        self.modifiers = {
+            "jump": 1,
+            "dash": 1,
+            "attack": 1,
+            "speed":1,
+            "slow":1
+        }
         for statename, state in self.states.items():
             if statename in self.requestedStates:
-                if self.requestedStates[statename] ==True:
+                if self.requestedStates[statename] == True:
                     self.states[statename].enter()
                 else:
                     self.states[statename].exit()
@@ -238,20 +266,26 @@ class StateMachine:
             if state.active:
                 state.update()
         self.requestedStates = {}
-        
 
         for affect in self.affects:
             affect.update()
             if affect.active == False:
                 self.affects.remove(affect)
-        
+        try:    
+            self.sprite.jump_speed = JUMP_SPEED * self.modifiers["jump"]
+            self.sprite.dash_speed = DASH_SPEED * self.modifiers["dash"]
+            self.sprite.speed = PLAYER_SPEED * self.modifiers["speed"]
+        except Exception as e:
+            pass
 
     def stateManage(self, statename, bool):
 
         if statename in self.states:
             self.requestedStates[statename] = bool
+
     def addAffect(self, affect):
         self.affects.append(affect)
+
 
 def Player_STATES(sprite):
     return [
@@ -262,7 +296,9 @@ def Player_STATES(sprite):
         Player_Attacking(False, sprite),
         Stunned(False, sprite),
         Invincible(False, sprite),
+        Slowed(False, sprite),
     ]
+
 
 def Mob_STATES(mob):
     return [
@@ -272,112 +308,141 @@ def Mob_STATES(mob):
         Mob_Attacking(False, mob),
         Stunned(False, mob),
         Invincible(False, mob),
-    ]   
-#abilities
+    ]
+
+
+# abilities
 class MeleeAbility(Sprite):
-        def __init__(self, sprite,image,cooldown,duration,damage,knockback,stun_time,invincible_time,affects=[]):
-            self.sprite = sprite
-            Sprite.__init__(self, self.sprite.game.all_sprites)
-            self.sprite.game.all_attacks.add(self)
-            self.pos = self.sprite.pos
-            self.damage = damage
-            self.knockback = knockback
-            self.stun_time = stun_time
-            self.invincible_time = invincible_time
-            self.affects = affects
-            if image != None:
-                self.image = pg.Surface((0, 0))
-                self.spritesheet = Spritesheet(
-                    path.join(self.sprite.game.img_dir, image)
-                )
-            else:
-                self.image = None
-            self.hitbox = pg.mask.from_surface(self.image)
-            self.direction = 1
-            self.activetimer = Cooldown(duration)
-            self.cooldown = Cooldown(cooldown)
-            self.active = False
+    def __init__(
+        self,
+        sprite,
+        image,
+        cooldown,
+        duration,
+        damage,
+        knockback,
+        stun_time,
+        invincible_time,
+        self_stun,
+        affects=[],
+    ):
+        self.sprite = sprite
+        Sprite.__init__(self, self.sprite.game.all_sprites)
+        self.sprite.game.all_attacks.add(self)
+        self.pos = self.sprite.pos
+        self.damage = damage
+        self.knockback = knockback
+        self.stun_time = stun_time
+        self.invincible_time = invincible_time
+        self.affects = affects
+        if image != None:
+            self.image = pg.Surface((0, 0))
+            self.spritesheet = Spritesheet(path.join(self.sprite.game.img_dir, image))
+        else:
+            self.image = None
+        self.hitbox = pg.mask.from_surface(self.image)
+        self.direction = 1
+        self.activetimer = Cooldown(duration)
+        self.cooldown = Cooldown(cooldown)
+        self.active = False
+        self.self_stun = self_stun
 
-        def update(self):
+    def update(self):
 
-            self.active = not self.activetimer.ready()
-            
-            if self.active:
-                if self.direction == 1:
-                    self.image = self.spritesheet.get_image(0, 0, 64, 64)
-                else:
-                    self.image = pg.transform.flip(self.spritesheet.get_image(0, 0, 64, 64), True, False)
+        self.active = not self.activetimer.ready()
 
-            else:
-                self.image = pg.Surface((0, 0))
+        if self.active:
+            self.animate()
+            if self.direction == -1:
+                self.image = pg.transform.flip(self.image, True, False)
 
-            self.image.set_colorkey(BLACK)
-            self.rect = self.image.get_rect()
+        else:
+            self.image = pg.Surface((0, 0))
 
-            self.hitbox = pg.mask.from_surface(self.image)
+        self.image.set_colorkey(BLACK)
+        self.rect = self.image.get_rect()
 
-            self.pos = self.sprite.pos
-            self.rect.center = self.pos
+        self.hitbox = pg.mask.from_surface(self.image)
 
-        def activate(self,direction):
-            self.direction = direction
-            if self.cooldown.ready():
+        self.pos = self.sprite.pos
+        self.rect.center = self.pos
 
-                self.activetimer.start()
-                self.cooldown.start()
-                self.active = True
+    def animate(self):
+        max_frames = self.spritesheet.spritesheet.get_width() // 64
+        elapsed_time = self.activetimer.current_time - self.activetimer.start_time
+        progress = elapsed_time / self.activetimer.time
+        frame_index = int(progress * max_frames)
+        frame_index = min(frame_index, max_frames - 1)
+        self.image = self.spritesheet.get_image(frame_index * 64, 0, 64, 64)
 
-        def affect(self, sprite):
-            # this is where you can add knockback and stuff
-            sprite.vel.x += self.knockback[0]
-            sprite.vel.y += self.knockback[1]
-            sprite.health -= self.damage
-            sprite.state_machine.states["stunned"].enter(self.stun_time)
-            sprite.state_machine.states["invincible"].enter(self.invincible_time)
-            if self.affects != []:
-                for affect in self.affects:
-                    sprite.state_machine.affects.append(affect(sprite))
+    def activate(self, direction):
+        self.direction = direction
+        if self.cooldown.ready():
+            self.sprite.state_machine.states["slowed"].enter(self.self_stun)
+            self.activetimer.start()
+            self.cooldown.start()
+            self.active = True
+
+    def affect(self, sprite):
+        # this is where you can add knockback and stuff
+        sprite.vel.x += self.knockback[0]
+        sprite.vel.y += self.knockback[1]
+        sprite.health -= self.damage
+        sprite.state_machine.states["stunned"].enter(self.stun_time)
+        sprite.state_machine.states["invincible"].enter(self.invincible_time)
+        if self.affects != []:
+            for affect in self.affects:
+                sprite.state_machine.affects.append(affect(sprite))
+
 
 class RangedAbility(Sprite):
-        def __init__(self, sprite,cooldown,projectile,image = None):
-            self.sprite = sprite
-            Sprite.__init__(self, self.sprite.game.all_sprites)
-            self.pos = self.sprite.pos
-            self.projectiles = []
-            self.projectile = projectile
-            self.image = pg.Surface((1,1))
-            self.image.set_colorkey(BLACK)
-            self.rect = self.image.get_rect()
-            self.hitbox = pg.mask.from_surface(self.image)
-            
-            
-            self.direction = 1
-            self.cooldown = Cooldown(cooldown)
-            
+    def __init__(self, sprite, cooldown, projectile, self_stun, image=None):
+        self.sprite = sprite
+        Sprite.__init__(self, self.sprite.game.all_sprites)
+        self.pos = self.sprite.pos
+        self.projectiles = []
+        self.projectile = projectile
+        self.image = pg.Surface((1, 1))
+        self.image.set_colorkey(BLACK)
+        self.rect = self.image.get_rect()
+        self.hitbox = pg.mask.from_surface(self.image)
+        self.self_stun = self_stun
 
-        def update(self):
+        self.direction = 1
+        self.cooldown = Cooldown(cooldown)
 
-            
-            for projectile in self.projectiles:
-                projectile.update()
-                if projectile.active == False:
-                    self.projectiles.remove(projectile)
-                    projectile.kill()
+    def update(self):
 
+        for projectile in self.projectiles:
+            projectile.update()
+            if projectile.active == False:
+                self.projectiles.remove(projectile)
+                projectile.kill()
 
+        # self.pos = self.sprite.pos
+        # self.rect.center = self.pos
 
-            #self.pos = self.sprite.pos
-            #self.rect.center = self.pos
+    def activate(self, direction):
+        self.direction = direction
+        if self.cooldown.ready():
+            self.sprite.state_machine.states["slowed"].enter(self.self_stun)
+            self.projectiles.append(self.projectile(self.sprite, self.direction))
+            self.cooldown.start()
 
-        def activate(self,direction):
-            self.direction = direction
-            if self.cooldown.ready():
-                self.projectiles.append(self.projectile(self.sprite, self.direction))
-                self.cooldown.start()
-                
 
 class Projectile(Sprite):
-    def __init__(self, sprite, direction, image, speed, damage, knockback, stun_time, invincible_time, affects=[]):
+    def __init__(
+        self,
+        sprite,
+        direction,
+        image,
+        speed,
+        damage,
+        knockback,
+        stun_time,
+        invincible_time,
+        affects=[],
+    ):
         self.sprite = sprite
         Sprite.__init__(self, self.sprite.game.all_sprites)
         self.sprite.game.all_attacks.add(self)
@@ -396,88 +461,102 @@ class Projectile(Sprite):
         self.stun_time = stun_time
         self.invincible_time = invincible_time
         self.affects = affects
+
     def update(self):
         self.pos.x += self.speed * self.direction
         self.rect.center = self.pos
-        
+
         if self.active == False:
             self.die()
+
     def affect(self, sprite):
-            # this is where you can add knockback and stuff
-            sprite.vel.x += self.knockback[0]
-            sprite.vel.y += self.knockback[1]
-            sprite.health -= self.damage
-            sprite.state_machine.states["stunned"].enter(self.stun_time)
-            sprite.state_machine.states["invincible"].enter(self.invincible_time)
-            if self.affects != []:
-                for affect in self.affects:
-                    
-                    sprite.state_machine.affects.append(affect(sprite))
-            self.die()
-            self.active = False
+        # this is where you can add knockback and stuff
+        sprite.vel.x += self.knockback[0]
+        sprite.vel.y += self.knockback[1]
+        sprite.health -= self.damage
+        sprite.state_machine.states["stunned"].enter(self.stun_time)
+        sprite.state_machine.states["invincible"].enter(self.invincible_time)
+        if self.affects != []:
+            for affect in self.affects:
+
+                sprite.state_machine.affects.append(affect(sprite))
+        self.die()
+        self.active = False
+
     def die(self):
 
         self.kill()
 
+
 class BasicRangedAbility(RangedAbility):
     def __init__(self, sprite):
-        RangedAbility.__init__(self, sprite, 500, BasicProjectile)
+        RangedAbility.__init__(self, sprite, 500, BasicProjectile, 100)
 
 
 class BasicProjectile(Projectile):
     def __init__(self, sprite, direction):
-        Projectile.__init__(self, sprite, direction, None, 5, 5, [5, -5], 10, 10, [])
+        Projectile.__init__(self, sprite, direction, None,20, 5, [5, 0], 100, 100, [])
+
 
 class BasicAttack(MeleeAbility):
     def __init__(self, sprite):
-            
-        MeleeAbility.__init__(self, sprite, "attack.png", ATTACK_COOLDOWN, ATTACK_TIME, 10, [10, -20], STUN_TIME, STUN_TIME, [])
 
-        
+        MeleeAbility.__init__(
+            self,
+            sprite,
+            "sword.png",
+            ATTACK_COOLDOWN,
+            ATTACK_TIME,
+            10,
+            [10, -20],
+            STUN_TIME,
+            STUN_TIME,
+            ATTACK_TIME,
+            [],
+        )
+
 
 class Dash(Sprite):
-        def __init__(self, sprite):
-            self.sprite = sprite
+    def __init__(self, sprite):
+        self.sprite = sprite
 
-            self.pos = self.sprite.pos
+        self.pos = self.sprite.pos
 
-            """  self.image = pg.Surface((0, 0))
+        """  self.image = pg.Surface((0, 0))
 
             self.spritesheet = Spritesheet(
                 path.join(self.sprite.game.img_dir, "attack.png")
             ) """
 
-            """ self.hitbox = pg.mask.from_surface(self.image) """
+        """ self.hitbox = pg.mask.from_surface(self.image) """
 
-            self.activetimer = Cooldown(DASH_TIME)
-            self.cooldown = Cooldown(DASH_COOLDOWN)
-            self.cooldown.start()
-            self.active = False
-        
-        def update(self):
+        self.activetimer = Cooldown(DASH_TIME)
+        self.cooldown = Cooldown(DASH_COOLDOWN)
+        self.cooldown.start()
+        self.active = False
 
-            self.active = not self.activetimer.ready()
-            if self.active and self.sprite.vel.x != 0:
-                print("dashing big dawg")
+    def update(self):
 
-                self.sprite.vel.x += (
-                    self.sprite.vel.x / abs(self.sprite.vel.x) * DASH_SPEED
-                )
+        self.active = not self.activetimer.ready()
+        if self.active and self.sprite.vel.x != 0:
+            print("dashing big dawg")
 
-            """ else:
+            self.sprite.vel.x = self.sprite.vel.x / abs(self.sprite.vel.x) * self.sprite.dash_speed
+
+        """ else:
                 self.image = pg.Surface((0, 0)) """
 
-            """ self.image.set_colorkey(BLACK)
+        """ self.image.set_colorkey(BLACK)
             self.rect = self.image.get_rect()
 
             self.hitbox = pg.mask.from_surface(self.image) """
 
-            """ self.pos = self.sprite.pos
+        """ self.pos = self.sprite.pos
             self.rect.center = self.pos """
 
-        def activate(self):
-            if self.cooldown.ready():
+    def activate(self):
+        if self.cooldown.ready():
 
-                self.activetimer.start()
-                self.cooldown.start()
-                self.active = True
+            self.activetimer.start()
+            self.cooldown.start()
+            self.active = True

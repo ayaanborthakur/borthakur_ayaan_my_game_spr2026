@@ -38,11 +38,11 @@ class Camera:
         # apply a Deadzone on the Y axis so the camera doesn't pan vertically for small jumps!
         current_y_focus = self.offset.y + self.center.y
         dist_y = self.player.pos.y - current_y_focus
-        
+
         if dist_y > 100:
-            self.offset.y += (dist_y - 100)
+            self.offset.y += dist_y - 100
         elif dist_y < -100:
-            self.offset.y += (dist_y + 100)
+            self.offset.y += dist_y + 100
 
     def apply(self, sprite):
         return sprite.rect.move(-self.offset.x, -self.offset.y)
@@ -65,6 +65,7 @@ class Cooldown:
     def __init__(self, time):
         self.start_time = 0
         self.time = time
+        self.current_time = None
 
     def start(self, time=None):
         if time is not None:
@@ -73,12 +74,13 @@ class Cooldown:
 
     def ready(self):
         # sets current time to
-        current_time = pg.time.get_ticks()
+        self.current_time = pg.time.get_ticks()
         # if the difference between current and start time are greater than self.time
         # return True
-        if current_time - self.start_time >= self.time:
+        if self.current_time - self.start_time >= self.time:
             return True
         return False
+
     def reset(self):
         self.start_time = 0
 
@@ -88,16 +90,16 @@ class HealthBar(Sprite):
         self.sprite = sprite
         Sprite.__init__(self, self.sprite.game.all_sprites)
         self.prevhealth = sprite.health
-        
+
         self.width = 50
         self.update()
 
     def update(self):
-        health = int((self.prevhealth+self.sprite.health)/2)
+        health = int((self.prevhealth + self.sprite.health) / 2)
         self.prevhealth = health
         percent = health / HEALTH
-        
-        index = max(0, int(percent*self.width))
+
+        index = max(0, int(percent * self.width))
         if index == 0:
             index = 1
         bar_surf = pg.Surface((index, 10))
@@ -109,59 +111,59 @@ class HealthBar(Sprite):
         # 4. Fill it with a background color (optional, e.g., black)
         # self.image.fill((0, 0, 0))
         # 5. blit the health bar onto the main surface
-        
+
         self.image.blit(bar_surf, (2, 2))
-        pg.draw.rect(self.image, (1,1,1), (0,0, 54, 14),2,3)
-        
+        pg.draw.rect(self.image, (1, 1, 1), (0, 0, 54, 14), 2, 3)
+
         self.image.set_colorkey(BLACK)
         self.rect = self.image.get_rect()
         self.rect.center = (self.sprite.pos.x, self.sprite.pos.y)
-        self.rect.bottom = self.sprite.rect.top -10
+        self.rect.bottom = self.sprite.rect.top - 10
+
 
 class PlayerHealthBar(Sprite):
     def __init__(self, player):
         self.player = player
         self.prevhealth = player.health
-        self.pos = vec(0,0)
+        self.pos = vec(0, 0)
         self.update()
 
     def update(self):
-        
-        
-        health = int((self.prevhealth+self.player.health)/2)
-        
+
+        health = int((self.prevhealth + self.player.health) / 2)
+
         self.prevhealth = health
 
         percent = health / HEALTH
 
-        index = max(0, int(health *1.5))
-        
+        index = max(0, int(health * 1.5))
+
         if index == 0:
-            
-            
+
             bar_surf = pg.Surface((1, 20))
-            bar_surf.fill((255,255,255))
+            bar_surf.fill((255, 255, 255))
             # 2. Fill it with color
-            
+
         else:
             bar_surf = pg.Surface((index, 20))
-            
+
             # 2. Fill it with color
             bar_surf.fill((int(255 * (1 - percent)), int(255 * (percent)), 10))
 
         # 3. Create the main image surface (the full 100-width bar)
         self.image = pg.Surface((153, 23))
-        self.image.fill((255,255,255))
-        if index !=0:
-            pg.draw.rect(self.image, (0,0,0), (3,3,index,20))
+        self.image.fill((255, 255, 255))
+        if index != 0:
+            pg.draw.rect(self.image, (0, 0, 0), (3, 3, index, 20))
         # 4. Fill it with a background color (optional, e.g., black)
         # self.image.fill((0, 0, 0))
         # 5. blit the health bar onto the main surface
-        self.image.blit(bar_surf, (0,0))
-        
+        self.image.blit(bar_surf, (0, 0))
+
         self.image.set_colorkey(WHITE)
         self.rect = self.image.get_rect()
         self.pos.x = 20
         self.pos.y = 20
-        
+
+
 # loads an image file and creates an image surface for blitting or drawing images on the surface
