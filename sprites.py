@@ -364,11 +364,11 @@ class Player(Sprite):
                 self.basic_attack.activate(self.state_machine.states["running"].direction)
             if abs(self.vel.x) < self.speed:
                 if keys[self.keys["left"]]:
-                    self.vel.x = max(self.vel.x - ACCELERATION, -self.speed)
+                    self.vel.x = max(self.vel.x - ACCELERATION * self.state_machine.modifiers["accel"], -self.speed)
                     value = True
 
                 if keys[self.keys["right"]]:
-                    self.vel.x = min(self.vel.x + ACCELERATION, self.speed)
+                    self.vel.x = min(self.vel.x + ACCELERATION * self.state_machine.modifiers["accel"], self.speed)
                     value = True
         return value
     def die(self):
@@ -432,6 +432,8 @@ class Mob(Sprite):
         self.health = MOB_HEALTH
         self.healthbar = HealthBar(self)
         self.target = target
+        self.patrol_direction = 1
+        self.patrol_timer = pg.time.get_ticks()
         # self.pos = vec(x,y) * TILESIZE[1]
 
     def damage(self, attack):
@@ -448,8 +450,8 @@ class Mob(Sprite):
         self.healthbar.kill()
         self.kill()
     def update(self):
-        # calls movement toward sprite
-        self.move()
+        # calls AI behavior logic based on state
+        self.ai_behavior()
         # same as sprite   
         self.vel.x *= 0.75
        
@@ -477,6 +479,41 @@ class Mob(Sprite):
             ):
                 print("got hit")
                 self.damage(attack)
+
+    def has_line_of_sight(self):
+        start_pos = (self.pos.x, self.pos.y)
+        end_pos = (self.target.pos.x, self.target.pos.y)
+        for wall in self.game.all_walls:
+            if wall.rect.clipline(start_pos, end_pos):
+                return False
+        return True
+
+    def idle_behavior(self):
+        now = pg.time.get_ticks()
+        # Turn around every 3 seconds
+        if now - self.patrol_timer > 3000:
+            self.patrol_direction *= -1
+            self.patrol_timer = now
+        
+        # Pacing movement
+        if abs(self.vel.x) <= MOB_SPEED / 2:
+            self.vel.x += MOB_ACCELERATION * self.patrol_direction
+
+    def ai_behavior(self):
+        dist = (self.target.pos - self.pos).length()
+        
+        # Enter aggro if close and has line of sight
+        if dist < 400 and self.has_line_of_sight():
+            self.state_machine.stateManage("mob_aggro", True)
+            self.state_machine.stateManage("mob_idle", False)
+        else:
+            self.state_machine.stateManage("mob_aggro", False)
+            self.state_machine.stateManage("mob_idle", True)
+            
+        if self.state_machine.states["mob_aggro"].active:
+            self.move()
+        elif self.state_machine.states["mob_idle"].active:
+            self.idle_behavior()
 
     # gets teh neccesrary accleration to get to the sprite
     def move(self):

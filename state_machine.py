@@ -66,7 +66,7 @@ class Airborne(State):
         State.__init__(self, active, sprite)
 
     def update(self):
-        pass
+        self.sprite.state_machine.modifiers["accel"] = 0.2
 
     def get_name(self):
         return "airborne"
@@ -130,6 +130,19 @@ class Mob_Attacking(State):
     def check(self):
         pass
 
+class Mob_Idle(State):
+    def __init__(self, active, sprite):
+        State.__init__(self, active, sprite)
+
+    def get_name(self):
+        return "mob_idle"
+
+class Mob_Aggro(State):
+    def __init__(self, active, sprite):
+        State.__init__(self, active, sprite)
+
+    def get_name(self):
+        return "mob_aggro"
 
 class Stunned(State):
     def __init__(self, active, sprite):
@@ -253,7 +266,8 @@ class StateMachine:
             "dash": 1,
             "attack": 1,
             "speed":1,
-            "slow":1
+            "slow":1,
+            "accel":1
         }
         for statename, state in self.states.items():
             if statename in self.requestedStates:
@@ -308,6 +322,8 @@ def Mob_STATES(mob):
         Mob_Attacking(False, mob),
         Stunned(False, mob),
         Invincible(False, mob),
+        Mob_Idle(True, mob),
+        Mob_Aggro(False, mob),
     ]
 
 
