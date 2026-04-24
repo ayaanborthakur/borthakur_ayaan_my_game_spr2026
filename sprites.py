@@ -434,6 +434,7 @@ class Mob(Sprite):
         self.target = target
         self.patrol_direction = 1
         self.patrol_timer = pg.time.get_ticks()
+        self.basic_attack = MobBasicAttack(self)
         # self.pos = vec(x,y) * TILESIZE[1]
 
     def damage(self, attack):
@@ -459,6 +460,7 @@ class Mob(Sprite):
         
         swept_aabb_collide(self, self.game.all_walls)
         self.rect.center = self.pos
+        self.basic_attack.update()
         self.get_collisions()
         self.state_machine.update()
     def get_collisions(self):
@@ -496,23 +498,31 @@ class Mob(Sprite):
             self.patrol_timer = now
         
         # Pacing movement
-        if abs(self.vel.x) <= MOB_SPEED / 2:
-            self.vel.x += MOB_ACCELERATION * self.patrol_direction
+        target_speed = MOB_SPEED / 2
+        self.vel.x += MOB_ACCELERATION * self.patrol_direction
+        if abs(self.vel.x) > target_speed:
+            self.vel.x = target_speed * self.patrol_direction
 
     def ai_behavior(self):
         dist = (self.target.pos - self.pos).length()
         
-        # Enter aggro if close and has line of sight
-        if dist < 400 and self.has_line_of_sight():
+        # Try to attack if in range
+        if dist < 60:
+            direction = 1 if self.target.pos.x > self.pos.x else -1
+            self.basic_attack.activate(direction)
+            
+        # The ability inherently tracks its own "active" status and cooldowns
+        if self.basic_attack.attacking:
+            self.state_machine.stateManage("mob_aggro", False)
+            self.state_machine.stateManage("mob_idle", False)
+            self.vel.x *= 0.5 # Slow down horizontally while attacking
+        elif dist < 400 and self.has_line_of_sight():
             self.state_machine.stateManage("mob_aggro", True)
             self.state_machine.stateManage("mob_idle", False)
+            self.move()
         else:
             self.state_machine.stateManage("mob_aggro", False)
             self.state_machine.stateManage("mob_idle", True)
-            
-        if self.state_machine.states["mob_aggro"].active:
-            self.move()
-        elif self.state_machine.states["mob_idle"].active:
             self.idle_behavior()
 
     # gets teh neccesrary accleration to get to the sprite
