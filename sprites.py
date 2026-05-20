@@ -15,13 +15,14 @@ SKIN_WIDTH = 0.001  # tiny gap that prevents flush floating-point sticking
 MAX_SWEEP_ITERATIONS = 3
 
 
+#function for single sweep collision
 def sweep_single(pos, velocity, sprite_rect, wall_rect):
     """
     eaycast the sprite center point along velocity against the mickey mouse walls
 
 
     """
-    # nuild the minkowski "mickey mouse"-inflated AABB
+    # nuild the minkowski -inflated AABB
     half_w = sprite_rect.width / 2.0
     half_h = sprite_rect.height / 2.0
 
@@ -84,6 +85,7 @@ def sweep_single(pos, velocity, sprite_rect, wall_rect):
 """
 
 
+#function to resolve overlaps
 def _resolve_overlaps(sprite, group):
     """
     Discrete overlap check (SAT-lite for AABBs).
@@ -131,6 +133,14 @@ def _resolve_overlaps(sprite, group):
             sprite.vel.y = max(sprite.vel.y, 0)
 
 
+#dummy sprite class
+class _DummySprite(pg.sprite.Sprite):
+    #function for dummy sprite initialization
+    def __init__(self, rect):
+        pg.sprite.Sprite.__init__(self)
+        self.rect = rect
+
+#function for swept aabb collision
 def swept_aabb_collide(sprite, group):
     """
     Full swept AABB collision: resolves overlaps, then iteratively
@@ -142,6 +152,11 @@ def swept_aabb_collide(sprite, group):
         return
 
     # _resolve_overlaps(sprite, group)
+
+    # only check walls near the sprite's movement path
+    search_rect = sprite.rect.inflate(abs(sprite.vel.x) * 2 + TILESIZE * 4, abs(sprite.vel.y) * 2 + TILESIZE * 4)
+    dummy = _DummySprite(search_rect)
+    nearby_walls = pg.sprite.spritecollide(dummy, group, False)
 
     time_remaining = 1.0
     velocity = vec(sprite.vel)  # working copy for this frame
@@ -161,7 +176,7 @@ def swept_aabb_collide(sprite, group):
         best_toi = 1.0
         best_normal = None
 
-        for wall in group:
+        for wall in nearby_walls:
             toi, normal = sweep_single(sprite.pos, step_vel, sprite.rect, wall.rect)
             if toi < best_toi:
                 best_toi = toi
@@ -195,8 +210,10 @@ def swept_aabb_collide(sprite, group):
                 break
 
 
+#main player class
 class Player(Sprite):
 
+    #function for player initialization
     def __init__(self, game, x, y):
         # intializes neccesary values
         self.groups = game.all_sprites
@@ -213,6 +230,7 @@ class Player(Sprite):
         self.last_update = 0
         self.current_frame = 0
         self.health = HEALTH
+        self.max_health = self.health
         self.healthbar = PlayerHealthBar(self)
         self.spritesheet = Spritesheet(path.join(self.game.img_dir, "sprite_sheet.png"))
         self.load_images()
@@ -224,7 +242,7 @@ class Player(Sprite):
         self.basic_attack = BasicAttack(self)
         self.all_attacks.append(self.basic_attack)
         self.dash = Dash(self)
-        self.basic_ranged_ability = BasicRangedAbility(self)
+        self.basic_ranged_ability = RoarAttack(self)
         self.all_attacks.append(self.basic_ranged_ability)
         self.animate()
         self.keys = {
@@ -237,8 +255,9 @@ class Player(Sprite):
         self.jump_speed = JUMP_SPEED
         self.dash_speed = DASH_SPEED
         self.speed = PLAYER_SPEED
-        
+        self.kills = 0
 
+    #function for player update
     def update(self):
         # get keys and check if character is even moving
 
@@ -254,9 +273,9 @@ class Player(Sprite):
             pass
 
         self.vel.y += GRAVITY
-        
+
         slow_mod = self.state_machine.modifiers.get("slow", 1.0)
-        
+
         if slow_mod != 1.0:
             self.vel *= slow_mod
 
@@ -281,6 +300,7 @@ class Player(Sprite):
         self.basic_attack.update()
         self.get_collisions()
 
+    #function to get player collisions
     def get_collisions(self):
         for attack in self.game.all_attacks:
 
@@ -297,15 +317,16 @@ class Player(Sprite):
                     )
                 )
             ):
-                print("got hit")
                 self.damage(attack)
 
+    #function to damage player
     def damage(self, attack):
         if not self.state_machine.states["invincible"].active:
             attack.affect(self)
             if self.health <= 0:
                 self.die()
 
+    #function to load player images
     def load_images(self):
         # loads images for the sprite
         self.standing_frames = [
@@ -319,6 +340,7 @@ class Player(Sprite):
         # for frame in self.frames:
         #    frame.set_colorkey(BLACK)
 
+    #function to animate player
     def animate(self):
         now = pg.time.get_ticks()
 
@@ -337,52 +359,71 @@ class Player(Sprite):
             self.rect = self.image.get_rect()
             self.rect.center = center
 
+    #function to get player keys
     def get_keys(self):
         # gets keys and stuff
         keys = pg.key.get_pressed()
 
         value = False
 
-        print(self.speed)
-
         if not self.state_machine.states["stunned"].active:
             if (
                 keys[self.keys["jump"]]
                 and not self.state_machine.states["airborne"].active
             ):
-                print("jumped")
                 self.state_machine.stateManage("airborne", True)
                 self.vel.y = -self.jump_speed
             if keys[self.keys["dash"]]:
-                print("dashed")
                 self.dash.activate()
             if keys[self.keys["ranged"]]:
-                print("basic ranged ability")
-                self.basic_ranged_ability.activate(self.state_machine.states["running"].direction)
+                self.basic_ranged_ability.activate(
+                    self.state_machine.states["running"].direction
+                )
             if keys[self.keys["melee"]]:
-                print("attacked")
-                self.basic_attack.activate(self.state_machine.states["running"].direction)
+                self.basic_attack.activate(
+                    self.state_machine.states["running"].direction
+                )
             if abs(self.vel.x) < self.speed:
                 if keys[self.keys["left"]]:
-                    self.vel.x = max(self.vel.x - ACCELERATION * self.state_machine.modifiers["accel"], -self.speed)
+                    self.vel.x = max(
+                        self.vel.x
+                        - ACCELERATION * self.state_machine.modifiers["accel"],
+                        -self.speed,
+                    )
                     value = True
 
                 if keys[self.keys["right"]]:
-                    self.vel.x = min(self.vel.x + ACCELERATION * self.state_machine.modifiers["accel"], self.speed)
+                    self.vel.x = min(
+                        self.vel.x
+                        + ACCELERATION * self.state_machine.modifiers["accel"],
+                        self.speed,
+                    )
                     value = True
         return value
+
+    #function for player death
     def die(self):
-            
-            for sprite in self.game.all_sprites:
-                if hasattr(sprite, "sprite"):
-                    if sprite.sprite == self:
-                        sprite.kill()
-            self.kill()
-    
+
+        for sprite in self.game.all_sprites:
+            if hasattr(sprite, "sprite"):
+                if sprite.sprite == self:
+                    sprite.kill()
+        self.kill()
+
+    #function called when player kills a mob: increments kill count and upgrades base_modifiers
+    def on_kill(self):
+        self.kills += 1
+        sm = self.state_machine
+        sm.base_modifiers["speed"]  = round(sm.base_modifiers.get("speed",  1.0) + 0.05, 2)
+        sm.base_modifiers["jump"]   = round(sm.base_modifiers.get("jump",   1.0) + 0.05, 2)
+        sm.base_modifiers["dash"]   = round(sm.base_modifiers.get("dash",   1.0) + 0.05, 2)
+        sm.base_modifiers["attack"] = round(sm.base_modifiers.get("attack", 1.0) + 0.10, 2)
 
 
+#dino player class
 class Dino(Player):
 
+    #function for dino initialization
     def __init__(self, game, x, y):
         Player.__init__(self, game, x, y)
         self.keys = {
@@ -395,11 +436,21 @@ class Dino(Player):
         }
         if hasattr(self.game, "left_side"):
             self.side = self.game.left_side
-        
+
+        # Swap BasicAttack for DinoBasicAttack for Dino
+        if self.basic_attack in self.all_attacks:
+            self.all_attacks.remove(self.basic_attack)
+            self.game.all_attacks.remove(self.basic_attack)
+            self.basic_attack.kill()
+
+        self.basic_attack = DinoBasicAttack(self)
+        self.all_attacks.append(self.basic_attack)
 
 
+#alien player class
 class Alien(Player):
 
+    #function for alien initialization
     def __init__(self, game, x, y):
         Player.__init__(self, game, x, y)
         self.keys = {
@@ -412,57 +463,147 @@ class Alien(Player):
         }
         if hasattr(self.game, "right_side"):
             self.side = self.game.right_side
+            
+        # Swap RoarAttack for BasicRangedAbility for Alien
+        if self.basic_ranged_ability in self.all_attacks:
+            self.all_attacks.remove(self.basic_ranged_ability)
+            self.game.all_attacks.remove(self.basic_ranged_ability)
+            self.basic_ranged_ability.kill()
+            
+        self.basic_ranged_ability = BasicRangedAbility(self)
+        self.all_attacks.append(self.basic_ranged_ability)
 
 
+#mob class
 class Mob(Sprite):
     # initialize the instance
-    def __init__(self, game, x, y,target):
+    #function for mob initialization
+    def __init__(self, game, x, y, target, **kwargs):
         self.groups = game.all_sprites
         Sprite.__init__(self, self.groups)
         self.game = game
         self.image = pg.Surface((TILESIZE, TILESIZE))
-        self.image.fill(BLUE)
+
         self.hitbox = pg.mask.from_surface(self.image)
         self.rect = self.image.get_rect()
         self.accel = vec(0, 0)
         self.vel = vec(0, 0)
         self.pos = vec(x, y)
+        self.last_update = 0
+        self.current_frame = 0
         self.state_machine = StateMachine(self)
         self.state_machine.start_machine(Mob_STATES(self))
-        self.health = MOB_HEALTH
+        # Custom mob stats from map properties (with fallback defaults)
+        self.health = kwargs.get("health", MOB_HEALTH)
+        self.max_health = self.health
+        self.mob_speed = kwargs.get("speed", MOB_SPEED)
+        self.mob_damage = kwargs.get("damage", 10)
+        self.aggro_range = kwargs.get("aggro_range", 400)
         self.healthbar = HealthBar(self)
         self.target = target
         self.patrol_direction = 1
         self.patrol_timer = pg.time.get_ticks()
         self.basic_attack = MobBasicAttack(self)
         # self.pos = vec(x,y) * TILESIZE[1]
+        self.spritesheet = Spritesheet(path.join(self.game.img_dir, "mob.png"))
+        self.load_images()
+        self.animate()
+    #ai used to plan this function
+    #function to find nearest player
+    def find_nearest_player(self):
+        nearest = None
+        nearest_dist = float('inf')
+        for player in self.game.all_players:
+            if player.alive():
+                dist = (player.pos - self.pos).length()
+                if dist < nearest_dist:
+                    nearest_dist = dist
+                    nearest = player
+        if nearest is not None:
+            self.target = nearest
 
+    #function to damage mob
     def damage(self, attack):
         if not self.state_machine.states["invincible"].active:
             attack.affect(self)
             if self.health <= 0:
+                # notify the attacker so they can gain kill bonuses
+                if hasattr(attack.sprite, 'on_kill'):
+                    attack.sprite.on_kill()
                 self.die()
+
+    #function for mob death
     def die(self):
-        
+
         for sprite in self.game.all_sprites:
             if hasattr(sprite, "sprite"):
                 if sprite.sprite == self:
                     sprite.kill()
         self.healthbar.kill()
         self.kill()
+
+    #function for mob update
     def update(self):
+        # dynamically find nearest player to target
+        self.find_nearest_player()
         # calls AI behavior logic based on state
         self.ai_behavior()
-        # same as sprite   
+        # same as sprite
         self.vel.x *= 0.75
-       
+
         self.vel.y += GRAVITY
-        
+
         swept_aabb_collide(self, self.game.all_walls)
         self.rect.center = self.pos
         self.basic_attack.update()
         self.get_collisions()
         self.state_machine.update()
+        self.animate()
+
+    #function to load mob images
+    def load_images(self):
+        # loads images for the sprite
+        self.standing_frames = []
+        self.running_frames = []
+        for i in range(15):
+            self.running_frames.append(
+                self.spritesheet.get_image(i * TILESIZE, 0, TILESIZE, TILESIZE)
+            )
+            self.running_frames[-1].set_colorkey(BLACK)
+            self.standing_frames.append(
+                self.spritesheet.get_image(i * TILESIZE, TILESIZE, TILESIZE, TILESIZE)
+            )
+
+            self.standing_frames[-1].set_colorkey(BLACK)
+
+    #function to animate mob
+    def animate(self):
+        now = pg.time.get_ticks()
+
+        if now - self.last_update > 40:
+            self.last_update = now
+            center = self.rect.center
+            if self.state_machine.states["running"].active:
+                self.current_frame = (self.current_frame + 1) % len(self.running_frames)
+                if self.state_machine.states["running"].direction == -1:
+                    self.image = pg.transform.flip(
+                        self.running_frames[self.current_frame], True, False
+                    )
+                else:
+
+                    self.image = self.running_frames[self.current_frame]
+            elif self.state_machine.states["idle"].active:
+                self.current_frame = (self.current_frame + 1) % len(
+                    self.standing_frames
+                )
+                self.image = self.standing_frames[self.current_frame]
+
+            self.rect = self.image.get_rect()
+            self.image.set_colorkey(BLACK)
+            self.hitbox = pg.mask.from_surface(self.image)
+            self.rect.center = center
+
+    #function to get mob collisions
     def get_collisions(self):
         for attack in self.game.all_attacks:
 
@@ -479,44 +620,54 @@ class Mob(Sprite):
                     )
                 )
             ):
-                print("got hit")
                 self.damage(attack)
-
+    #mob ai behavior, improved and edited by claude opus
+    #function to check mob line of sight
     def has_line_of_sight(self):
         start_pos = (self.pos.x, self.pos.y)
         end_pos = (self.target.pos.x, self.target.pos.y)
+        # only check walls in the bounding area between mob and target
+        min_x = min(start_pos[0], end_pos[0]) - TILESIZE
+        min_y = min(start_pos[1], end_pos[1]) - TILESIZE
+        max_x = max(start_pos[0], end_pos[0]) + TILESIZE
+        max_y = max(start_pos[1], end_pos[1]) + TILESIZE
         for wall in self.game.all_walls:
-            if wall.rect.clipline(start_pos, end_pos):
+            wr = wall.rect
+            if wr.right < min_x or wr.left > max_x or wr.bottom < min_y or wr.top > max_y:
+                continue
+            if wr.clipline(start_pos, end_pos):
                 return False
         return True
 
+    #function for mob idle behavior
     def idle_behavior(self):
         now = pg.time.get_ticks()
-        # Turn around every 3 seconds
+        #turn around every 3 seconds
         if now - self.patrol_timer > 3000:
             self.patrol_direction *= -1
             self.patrol_timer = now
-        
-        # Pacing movement
-        target_speed = MOB_SPEED / 2
+
+        #pacing movement using mob's own speed
+        target_speed = self.mob_speed / 2
         self.vel.x += MOB_ACCELERATION * self.patrol_direction
         if abs(self.vel.x) > target_speed:
             self.vel.x = target_speed * self.patrol_direction
 
+    #function for mob ai behavior
     def ai_behavior(self):
         dist = (self.target.pos - self.pos).length()
-        
-        # Try to attack if in range
+
+        #try to attack if in range
         if dist < 60:
             direction = 1 if self.target.pos.x > self.pos.x else -1
             self.basic_attack.activate(direction)
-            
-        # The ability inherently tracks its own "active" status and cooldowns
+
+        #the ability inherently tracks its own "active" status and cooldowns
         if self.basic_attack.attacking:
             self.state_machine.stateManage("mob_aggro", False)
             self.state_machine.stateManage("mob_idle", False)
-            self.vel.x *= 0.5 # Slow down horizontally while attacking
-        elif dist < 400 and self.has_line_of_sight():
+            self.vel.x *= 0.5  # Slow down horizontally while attacking
+        elif dist < self.aggro_range and self.has_line_of_sight():
             self.state_machine.stateManage("mob_aggro", True)
             self.state_machine.stateManage("mob_idle", False)
             self.move()
@@ -526,33 +677,34 @@ class Mob(Sprite):
             self.idle_behavior()
 
     # gets teh neccesrary accleration to get to the sprite
+    #function for mob movement
     def move(self):
-        #x calculations
-        if abs(self.vel.x) <= MOB_SPEED:
+        # x calculations using mob's own speed
+        if abs(self.vel.x) <= self.mob_speed:
             if self.target.pos.x > self.pos.x + MOB_ACCELERATION:
-                self.vel.x += MOB_ACCELERATION  
+                self.vel.x += MOB_ACCELERATION
             elif self.target.pos.x > self.pos.x:
                 self.vel.x += self.target.pos.x - self.pos.x
             if self.target.pos.x < self.pos.x - MOB_ACCELERATION:
-                self.vel.x -= MOB_ACCELERATION 
+                self.vel.x -= MOB_ACCELERATION
             elif self.target.pos.x < self.pos.x:
                 self.vel.x -= self.target.pos.x - self.pos.x
-            if abs(self.vel.x) + abs(MOB_ACCELERATION) >= MOB_SPEED:
+            if abs(self.vel.x) + abs(MOB_ACCELERATION) >= self.mob_speed:
                 if self.target.pos.x > self.pos.x:
-                    self.vel.x = MOB_SPEED
+                    self.vel.x = self.mob_speed
                 elif self.target.pos.x < self.pos.x:
-                    self.vel.x = -MOB_SPEED
-        #y calculations
+                    self.vel.x = -self.mob_speed
+        # y calculations
         if self.state_machine.states["airborne"].active == False:
-            if self.target.pos.y<self.pos.y - MOB_JUMP:
+            if self.target.pos.y < self.pos.y - MOB_JUMP:
                 self.vel.y -= MOB_JUMP
-            elif self.target.pos.y<self.pos.y:
+            elif self.target.pos.y < self.pos.y:
                 self.vel.y += self.target.pos.y - self.pos.y
-       
-            
-        
 
+
+#wall class
 class Wall(Sprite):
+    #function for wall initialization
     def __init__(self, game, x, y):
         self.groups = game.all_sprites
         Sprite.__init__(self, self.groups)
@@ -567,11 +719,14 @@ class Wall(Sprite):
         self.pos = vec(x + TILESIZE / 2, y + TILESIZE / 2)
         # self.pos = vec(x,y) * TILESIZE[1]
 
+    #function for wall update
     def update(self):
         self.rect.center = self.pos
 
 
+#coin class
 class Coin(Sprite):
+    #function for coin initialization
     def __init__(self, game, x, y):
         self.groups = game.all_sprites
         Sprite.__init__(self, self.groups)
@@ -584,5 +739,6 @@ class Coin(Sprite):
         self.pos = vec(x + TILESIZE / 2, y + TILESIZE / 2)
         # self.pos = vec(x,y) * TILESIZE[1]
 
+    #function for coin update
     def update(self):
         self.rect.center = self.pos

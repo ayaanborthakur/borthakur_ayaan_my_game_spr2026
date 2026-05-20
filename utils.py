@@ -8,7 +8,9 @@ from pygame.sprite import Sprite
 vec = pg.math.Vector2
 
 
+#map class
 class Map:
+    #function for map initialization
     def __init__(self, filename):
         # creates empty list for map data
         self.data = []
@@ -24,13 +26,16 @@ class Map:
         self.map_height = self.tileheight * 32
 
 
+#camera class
 class Camera:
+    #function for camera initialization
     def __init__(self, player, game):
         self.game = game
         self.player = player
         self.offset = vec(0, 0)
         self.center = vec(WIDTH / 4, HEIGHT / 2)
 
+    #function for camera update: rigidly tracks player horizontally while applying a vertical deadzone buffer to prevent jerking during small jumps
     def update(self):
         # rigidly follow on X axis
         self.offset.x = self.player.pos.x - self.center.x
@@ -44,14 +49,18 @@ class Camera:
         elif dist_y < -100:
             self.offset.y += dist_y + 100
 
+    #function to apply camera offset
     def apply(self, sprite):
         return sprite.rect.move(-self.offset.x, -self.offset.y)
 
 
+#spritesheet class
 class Spritesheet:
+    #function for spritesheet initialization
     def __init__(self, filename):
         self.spritesheet = pg.image.load(filename).convert()
 
+    #function to get image from spritesheet
     def get_image(self, x, y, width, height):
         image = pg.Surface((width, height))
         image.blit(self.spritesheet, (0, 0), (x, y, width, height))
@@ -61,17 +70,21 @@ class Spritesheet:
 
 
 # This class can be used to create a Cooldwon
+#cooldown class
 class Cooldown:
+    #function for cooldown initialization
     def __init__(self, time):
         self.start_time = 0
         self.time = time
         self.current_time = None
 
+    #function to start cooldown
     def start(self, time=None):
         if time is not None:
             self.time = time
         self.start_time = pg.time.get_ticks()
 
+    #function to check if cooldown is ready
     def ready(self):
         # sets current time to
         self.current_time = pg.time.get_ticks()
@@ -81,11 +94,14 @@ class Cooldown:
             return True
         return False
 
+    #function to reset cooldown
     def reset(self):
         self.start_time = 0
 
 
+#health bar class
 class HealthBar(Sprite):
+    #function for health bar initialization
     def __init__(self, sprite):
         self.sprite = sprite
         Sprite.__init__(self, self.sprite.game.all_sprites)
@@ -94,10 +110,13 @@ class HealthBar(Sprite):
         self.width = 50
         self.update()
 
+    #function for health bar update: calculates smooth health percentage and scales colored surface width to represent remaining health
     def update(self):
         health = int((self.prevhealth + self.sprite.health) / 2)
         self.prevhealth = health
-        percent = health / HEALTH
+        max_health = getattr(self.sprite, 'max_health', HEALTH)
+        percent = health / max_health
+        percent = max(0.0, min(1.0, percent))
 
         index = max(0, int(percent * self.width))
         if index == 0:
@@ -121,20 +140,25 @@ class HealthBar(Sprite):
         self.rect.bottom = self.sprite.rect.top - 10
 
 
+#player health bar class
 class PlayerHealthBar(Sprite):
+    #function for player health bar initialization
     def __init__(self, player):
         self.player = player
         self.prevhealth = player.health
         self.pos = vec(0, 0)
         self.update()
 
+    #function for player health bar update: calculates smooth health percentage and scales colored surface width to represent remaining health
     def update(self):
 
         health = int((self.prevhealth + self.player.health) / 2)
 
         self.prevhealth = health
 
-        percent = health / HEALTH
+        max_health = getattr(self.player, 'max_health', HEALTH)
+        percent = health / max_health
+        percent = max(0.0, min(1.0, percent))
 
         index = max(0, int(health * 1.5))
 

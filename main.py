@@ -11,8 +11,10 @@ import json
 
 
 # overview - CONCISE AND INFORMATIVE
+#game class
 class Game:
     # initializes game instance
+    #function for game initialization
     def __init__(self):
         pg.init()
         self.clock = pg.time.Clock()
@@ -25,6 +27,7 @@ class Game:
         self.left_side = pg.Surface((WIDTH / 2, HEIGHT))
         self.right_side = pg.Surface((WIDTH / 2, HEIGHT))
 
+    #function to load game data
     def load_data(self):
         self.game_dir = path.dirname(__file__)
         self.img_dir = path.join(self.game_dir, "spritesheets")
@@ -35,6 +38,7 @@ class Game:
             path.join(self.img_dir, "coin.png")
         ).convert_alpha()
 
+    #function for new game setup
     def new(self):
         # creating all the sprites and mobs and walls
         self.load_data()
@@ -62,64 +66,59 @@ class Game:
         #         if tile == "b":
         #             self.alien = Alien(self, col, row)
 
+    #function to load map: parses tiled json map data to instantiate walls within map bounds and spawn players and mobs with custom properties
     def load_map(self):
         map_path = path.join(self.game_dir, "maps", "main_map.json")
         with open(map_path, "r") as f:
             map_data = json.load(f)
 
-        walls_layer = None
-        sprites_layer = None
+        tile_layer = None
+        object_layer = None
         for layer in map_data.get("layers", []):
-            if layer["name"] == "walls":
-                walls_layer = layer
-            elif layer["name"] == "sprites":
-                sprites_layer = layer
+            if layer["type"] == "tilelayer":
+                tile_layer = layer
+            elif layer["type"] == "objectgroup":
+                object_layer = layer
 
-        if walls_layer:
-            # Algorithm to find the farthest wall (max col and max row)
-            max_col = -1
-            max_row = -1
-            for chunk in walls_layer.get("chunks", []):
-                for i, tile in enumerate(chunk["data"]):
-                    # non-zero means wall
-                    if tile == 1:
-                        col = chunk["x"] + (i % chunk["width"])
-                        row = chunk["y"] + (i // chunk["width"])
-                        max_col = max(max_col, col)
-                        max_row = max(max_row, row)
+        # Load walls from tile layer
+        if tile_layer:
+            map_w = tile_layer["width"]
+            data = tile_layer.get("data", [])
+            for i, tile in enumerate(data):
+                if tile != 0:  # any non-zero tile is a wall
+                    col = i % map_w
+                    row = i // map_w
+                    self.all_walls.add(
+                        Wall(self, col * TILESIZE, row * TILESIZE)
+                    )
 
-            # Instantiate walls up to max_col and max_row
-            for chunk in walls_layer.get("chunks", []):
-                for i, tile in enumerate(chunk["data"]):
-                    if tile == 1:
-                        col = chunk["x"] + (i % chunk["width"])
-                        row = chunk["y"] + (i // chunk["width"])
-                        if col <= max_col and row <= max_row:
-                            self.all_walls.add(
-                                Wall(self, col * TILESIZE, row * TILESIZE)
-                            )
+        # Load objects (players, mobs, coins)
+        if object_layer:
+            # Load players first so mobs can reference them
+            for obj in object_layer.get("objects", []):
+                if obj["type"] == "Dino":
+                    self.dino = Dino(self, obj["x"], obj["y"])
+                    self.all_players.add(self.dino)
+                elif obj["type"] == "Alien":
+                    self.alien = Alien(self, obj["x"], obj["y"])
+                    self.all_players.add(self.alien)
 
-        if sprites_layer:
-            for obj in sprites_layer.get("objects", []):
-
-                grid_x = obj["x"]
-                grid_y = obj["y"]
-
-                if obj["type"] == "Player":
-                    if obj["name"] == "player1":
-                        self.dino = Dino(self, grid_x, grid_y)
-                        self.all_players.add(self.dino)
-                    elif obj["name"] == "player2":
-                        self.alien = Alien(self, grid_x, grid_y)
-                        self.all_players.add(self.alien)
-                elif obj["type"] == "Mob":
-                    self.all_mobs.add(Mob(self, grid_x, grid_y,self.dino))
+            # Then load mobs with custom properties
+            for obj in object_layer.get("objects", []):
+                if obj["type"] == "Mob":
+                    mob_props = {}
+                    for prop in obj.get("properties", []):
+                        mob_props[prop["name"]] = prop["value"]
+                    self.all_mobs.add(Mob(self, obj["x"], obj["y"], self.dino, **mob_props))
+                elif obj["type"] == "Coin":
+                    Coin(self, obj["x"], obj["y"])
 
         if not hasattr(self, "dino"):
             self.dino = Dino(self, 10, 10)
         if not hasattr(self, "alien"):
             self.alien = Alien(self, 12, 10)
 
+    #function to run game loop
     def run(self):
         # runs the game
         while self.playing == True:
@@ -132,6 +131,7 @@ class Game:
         pg.quit()
 
     # manages keyboard and mouse events
+    #function to handle events
     def events(self):
         for event in pg.event.get():
             if self.cooldown.ready() == True:
@@ -146,6 +146,7 @@ class Game:
                 if event.type == pg.MOUSEMOTION:
                     pass
 
+    #function to update game state
     def update(self):
 
         self.all_sprites.update()
@@ -155,6 +156,7 @@ class Game:
             self.alien.healthbar.update()
 
     # not used anymore
+    #function to draw text
     def draw_text(self, surface, text, size, color, x, y):
         font_name = pg.font.match_font("arial")
         font = pg.font.Font(font_name, size)
@@ -164,7 +166,7 @@ class Game:
         surface.blit(text_surface, text_rect)
 
     # draws all sprites
-
+    #function to draw game screen: updates split screen cameras, performs viewport culling for left and right surfaces, and renders all visible sprites
     def draw(self):
         self.screen.fill(WHITE)
 
@@ -172,9 +174,19 @@ class Game:
         self.right_side.fill(WHITE)
         self.dino.camera.update()
         self.alien.camera.update()
+        left_rect = self.left_side.get_rect()
+        right_rect = self.right_side.get_rect()
+        
         for sprite in self.all_sprites:
-            self.left_side.blit(sprite.image, self.dino.camera.apply(sprite))
-            self.right_side.blit(sprite.image, self.alien.camera.apply(sprite))
+            # left side culling
+            left_pos = self.dino.camera.apply(sprite)
+            if left_pos.colliderect(left_rect):
+                self.left_side.blit(sprite.image, left_pos)
+            
+            # right side culling
+            right_pos = self.alien.camera.apply(sprite)
+            if right_pos.colliderect(right_rect):
+                self.right_side.blit(sprite.image, right_pos)
 
         # Draw borders ONCE and correctly sized after all sprites are blitted
         pg.draw.rect(self.left_side, BLACK, (0, 0, (WIDTH / 2)+5, HEIGHT), width=10)
