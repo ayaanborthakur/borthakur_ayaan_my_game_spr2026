@@ -26,6 +26,7 @@ class Game:
         self.cooldown = Cooldown(15)
         self.left_side = pg.Surface((WIDTH / 2, HEIGHT))
         self.right_side = pg.Surface((WIDTH / 2, HEIGHT))
+        self.stat_font = pg.font.SysFont("arial", 16)
 
     #function to load game data
     def load_data(self):
@@ -37,6 +38,10 @@ class Game:
         self.coin_img = pg.image.load(
             path.join(self.img_dir, "coin.png")
         ).convert_alpha()
+        
+        # Pre-load and scale the background image
+        bg_image = pg.image.load(path.join(self.img_dir, "jungle.png")).convert_alpha()
+        self.bg_image_scaled = pg.transform.scale(bg_image, (WIDTH/2, HEIGHT))
 
     #function for new game setup
     def new(self):
@@ -150,12 +155,18 @@ class Game:
     def update(self):
 
         self.all_sprites.update()
+        
+        # check coin collisions
+        for player in self.all_players:
+            hits = pg.sprite.spritecollide(player, self.all_coins, True)
+            for coin in hits:
+                player.health = min(getattr(player, 'max_health', 100), player.health + 10)
+
         if hasattr(self, "dino"):
             self.dino.healthbar.update()
         if hasattr(self, "alien"):
             self.alien.healthbar.update()
 
-    # not used anymore
     #function to draw text
     def draw_text(self, surface, text, size, color, x, y):
         font_name = pg.font.match_font("arial")
@@ -165,13 +176,51 @@ class Game:
         text_rect.midtop = (x, y)
         surface.blit(text_surface, text_rect)
 
+    def show_start_screen(self):
+        self.screen.fill(WHITE)
+        self.draw_text(self.screen, "Dino vs Alien", 64, BLACK, WIDTH / 2, HEIGHT / 6)
+        self.draw_text(self.screen, "Goal: Defeat your opponent!", 32, BLACK, WIDTH / 2, HEIGHT / 4 + 20)
+        
+        self.draw_text(self.screen, "Dino Controls:", 28, BLACK, WIDTH / 4, HEIGHT / 2 - 50)
+        self.draw_text(self.screen, "Move: A / D", 24, BLACK, WIDTH / 4, HEIGHT / 2 - 10)
+        self.draw_text(self.screen, "Jump: W", 24, BLACK, WIDTH / 4, HEIGHT / 2 + 20)
+        self.draw_text(self.screen, "Dash: S", 24, BLACK, WIDTH / 4, HEIGHT / 2 + 50)
+        self.draw_text(self.screen, "Melee: LSHIFT", 24, BLACK, WIDTH / 4, HEIGHT / 2 + 80)
+        self.draw_text(self.screen, "Ranged: LALT", 24, BLACK, WIDTH / 4, HEIGHT / 2 + 110)
+
+        self.draw_text(self.screen, "Alien Controls:", 28, BLACK, WIDTH * 3 / 4, HEIGHT / 2 - 50)
+        self.draw_text(self.screen, "Move: L / '", 24, BLACK, WIDTH * 3 / 4, HEIGHT / 2 - 10)
+        self.draw_text(self.screen, "Jump: P", 24, BLACK, WIDTH * 3 / 4, HEIGHT / 2 + 20)
+        self.draw_text(self.screen, "Dash: ;", 24, BLACK, WIDTH * 3 / 4, HEIGHT / 2 + 50)
+        self.draw_text(self.screen, "Melee: RSHIFT", 24, BLACK, WIDTH * 3 / 4, HEIGHT / 2 + 80)
+        self.draw_text(self.screen, "Ranged: RALT", 24, BLACK, WIDTH * 3 / 4, HEIGHT / 2 + 110)
+
+        self.draw_text(self.screen, "Press ANY KEY to start", 32, BLACK, WIDTH / 2, HEIGHT * 5 / 6)
+        pg.display.flip()
+        self.wait_for_key()
+
+    def wait_for_key(self):
+        waiting = True
+        while waiting:
+            self.clock.tick(FPS)
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
+                    waiting = False
+                    self.playing = False
+                    pg.quit()
+                    sys.exit()
+                if event.type == pg.KEYUP:
+                    waiting = False
+
     # draws all sprites
     #function to draw game screen: updates split screen cameras, performs viewport culling for left and right surfaces, and renders all visible sprites
     def draw(self):
         self.screen.fill(WHITE)
 
         self.left_side.fill(WHITE)
+        self.left_side.blit(self.bg_image_scaled, (0, 0))
         self.right_side.fill(WHITE)
+        self.right_side.blit(self.bg_image_scaled, (0, 0))
         self.dino.camera.update()
         self.alien.camera.update()
         left_rect = self.left_side.get_rect()
@@ -192,7 +241,21 @@ class Game:
         pg.draw.rect(self.left_side, BLACK, (0, 0, (WIDTH / 2)+5, HEIGHT), width=10)
         pg.draw.rect(self.right_side, BLACK, (-5, 0, (WIDTH / 2)+5, HEIGHT), width=10)
         self.left_side.blit(self.dino.healthbar.image, (self.dino.healthbar.pos.x,self.dino.healthbar.pos.y))
+        
+        # Display Dino stats
+        dino_mods = self.dino.state_machine.base_modifiers
+        dino_text = f"Spd: {dino_mods.get('speed', 1.0):.2f} | Jmp: {dino_mods.get('jump', 1.0):.2f} | Dsh: {dino_mods.get('dash', 1.0):.2f} | Atk: {dino_mods.get('attack', 1.0):.2f}"
+        dino_surf = self.stat_font.render(dino_text, True, BLACK)
+        self.left_side.blit(dino_surf, (self.dino.healthbar.pos.x, self.dino.healthbar.pos.y + 25))
+        
         self.right_side.blit(self.alien.healthbar.image, (self.alien.healthbar.pos.x,self.alien.healthbar.pos.y))
+        
+        # Display Alien stats
+        alien_mods = self.alien.state_machine.base_modifiers
+        alien_text = f"Spd: {alien_mods.get('speed', 1.0):.2f} | Jmp: {alien_mods.get('jump', 1.0):.2f} | Dsh: {alien_mods.get('dash', 1.0):.2f} | Atk: {alien_mods.get('attack', 1.0):.2f}"
+        alien_surf = self.stat_font.render(alien_text, True, BLACK)
+        self.right_side.blit(alien_surf, (self.alien.healthbar.pos.x, self.alien.healthbar.pos.y + 25))
+        
         self.screen.blit(self.left_side, (0, 0))
         self.screen.blit(self.right_side, (WIDTH / 2, 0))
         pg.display.flip()
@@ -201,5 +264,6 @@ class Game:
 if __name__ == "__main__":
     #    creating an instance or instantiating the Game class
     g = Game()
+    g.show_start_screen()
     g.new()
     g.run()

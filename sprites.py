@@ -728,7 +728,7 @@ class Wall(Sprite):
 class Coin(Sprite):
     #function for coin initialization
     def __init__(self, game, x, y):
-        self.groups = game.all_sprites
+        self.groups = game.all_sprites, game.all_coins
         Sprite.__init__(self, self.groups)
         self.game = game
         self.image = game.coin_img

@@ -685,6 +685,8 @@ class RoarAttack(RangedAbility):
 
 #roar projectile class
 class RoarProjectile(Projectile):
+    _cache = {}
+
     #function for roar projectile initialization
     def __init__(self, sprite, direction):
         Projectile.__init__(
@@ -698,16 +700,24 @@ class RoarProjectile(Projectile):
 
     #function to animate roar projectile: scales projectile image size dynamically based on elapsed lifetime
     def animate(self):
+        if self.lifetime.ready():
+            self.active = False
+            return
+        
         # calculate how long this projectile has been alive
         age = pg.time.get_ticks() - self.birth_time
         progress = age / 15
         current_size = int(self.base_size + progress)
-        #read from the original spritesheet, then scale to the growing size
-        self.image = self.spritesheet.get_image(0, 0, 64, 64)
-        self.image = pg.transform.scale(self.image, (current_size, current_size))
-        self.image.set_colorkey(BLACK)
+        
+        if current_size not in RoarProjectile._cache:
+            img = self.spritesheet.get_image(0, 0, 64, 64)
+            img = pg.transform.scale(img, (current_size, current_size))
+            img.set_colorkey(BLACK)
+            mask = pg.mask.from_surface(img)
+            RoarProjectile._cache[current_size] = (img, mask)
+        
+        self.image, self.hitbox = RoarProjectile._cache[current_size]
         self.rect = self.image.get_rect(center=(int(self.pos.x), int(self.pos.y)))
-        self.hitbox = pg.mask.from_surface(self.image)
    
 
 
