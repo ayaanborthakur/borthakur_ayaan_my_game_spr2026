@@ -80,9 +80,7 @@ def sweep_single(pos, velocity, sprite_rect, wall_rect):
     return toi, normal
 
 
-"""
-100% ai made function, was just for testing. not used in the code.
-"""
+
 
 
 #function to resolve overlaps
